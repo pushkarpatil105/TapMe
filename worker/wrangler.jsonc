@@ -24,7 +24,7 @@
 		 *   - via Cloudflare Dashboard: Workers & Pages > worker > Settings > Variables and Secrets
 		 *   - or via wrangler.jsonc env.production.vars
 		 */
-		"ADMIN_ORIGINS": "http://localhost:5173",
+		"ADMIN_ORIGINS": "https://tapme-ayd.pages.dev",
 		"COOKIE_SAME_SITE": "Lax",
 		"COOKIE_NAME": "tapme_session"
 	},
