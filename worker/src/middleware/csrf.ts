@@ -1,4 +1,5 @@
 import type { AppEnv } from "../types";
+import { getAllowedOrigins } from "./cors";
 
 const STATE_CHANGING_METHODS = new Set([
   "POST",
@@ -6,22 +7,6 @@ const STATE_CHANGING_METHODS = new Set([
   "PATCH",
   "DELETE",
 ]);
-
-function getAllowedOrigins(env: AppEnv): Set<string> {
-  return new Set(
-    env.ADMIN_ORIGINS.split(",")
-      .map((origin) => origin.trim())
-      .filter(Boolean)
-      .map((origin) => {
-        try {
-          return new URL(origin).origin;
-        } catch {
-          return "";
-        }
-      })
-      .filter(Boolean),
-  );
-}
 
 export function isTrustedOrigin(
   request: Request,

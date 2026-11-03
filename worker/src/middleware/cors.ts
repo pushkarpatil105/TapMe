@@ -1,4 +1,3 @@
-
 import type { AppEnv } from "../types";
 
 const ALLOWED_METHODS = new Set([
@@ -11,14 +10,24 @@ const ALLOWED_METHODS = new Set([
 
 const ALLOWED_HEADERS = new Set([
   "content-type",
+  "accept",
 ]);
 
-function getAllowedOrigins(env: AppEnv): Set<string> {
+export function getAllowedOrigins(env: AppEnv): Set<string> {
+  if (!env || typeof env.ADMIN_ORIGINS !== "string") {
+    return new Set();
+  }
+
   return new Set(
     env.ADMIN_ORIGINS.split(",")
       .map((origin) => origin.trim())
       .filter(Boolean)
       .map((origin) => {
+        // Reject wildcards completely
+        if (origin === "*" || origin.includes("*")) {
+          return "";
+        }
+
         try {
           const url = new URL(origin);
 
@@ -26,7 +35,7 @@ function getAllowedOrigins(env: AppEnv): Set<string> {
           // credentials, query strings, or fragments.
           if (
             !["http:", "https:"].includes(url.protocol) ||
-            url.origin !== origin.replace(/\/$/, "") ||
+            url.origin !== origin.replace(/\/+$/, "") ||
             url.username ||
             url.password
           ) {
@@ -50,7 +59,7 @@ export function corsHeaders(
     "Vary": "Origin",
     "Access-Control-Allow-Methods":
       "GET, POST, PUT, PATCH, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, Accept",
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Max-Age": "86400",
   });

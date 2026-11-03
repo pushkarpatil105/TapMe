@@ -1,10 +1,9 @@
-
 import { describe, it, expect } from "vitest";
 import { checkCsrf } from "./csrf";
 import type { AppEnv } from "../types";
 
 const mockEnv = {
-    ADMIN_ORIGINS: "http://localhost:5173",
+    ADMIN_ORIGINS: "http://localhost:5173,https://admin.tapme.example.com",
 } as AppEnv;
 
 function createRequest(
@@ -26,6 +25,12 @@ function createRequest(
 describe("CSRF protection", () => {
     it("allows a trusted origin", () => {
         const request = createRequest("POST", "http://localhost:5173");
+
+        expect(checkCsrf(request, mockEnv)).toBeNull();
+    });
+
+    it("allows a second configured trusted origin", () => {
+        const request = createRequest("POST", "https://admin.tapme.example.com");
 
         expect(checkCsrf(request, mockEnv)).toBeNull();
     });
@@ -70,5 +75,13 @@ describe("CSRF protection", () => {
             expect(checkCsrf(request, mockEnv)).toBeNull();
         }
     });
-});
 
+    it("rejects state-changing requests when ADMIN_ORIGINS contains wildcard *", () => {
+        const wildcardEnv = {
+            ADMIN_ORIGINS: "*",
+        } as AppEnv;
+        const request = createRequest("POST", "https://anywhere.com");
+
+        expect(checkCsrf(request, wildcardEnv)?.status).toBe(403);
+    });
+});

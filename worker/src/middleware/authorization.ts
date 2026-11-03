@@ -21,7 +21,7 @@ export type AuthResult =
       response: Response;
     };
 
-function getCookie(
+export function getCookie(
   request: Request,
   name: string,
 ): string | null {

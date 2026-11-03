@@ -12,10 +12,22 @@
 		"enabled": true
 	},
 	"vars": {
-  		"ADMIN_ORIGINS": "http://localhost:5173",
-  		"COOKIE_SAME_SITE": "Lax",
-  		"COOKIE_NAME": "tapme_session"
-},
+		/**
+		 * ADMIN_ORIGINS: Permitted frontend origin(s) for CORS and CSRF protection.
+		 * In local development, defaults to "http://localhost:5173".
+		 * In production with Cloudflare Pages (same-origin architecture via Service Binding):
+		 *   Set ADMIN_ORIGINS to your Cloudflare Pages public domain, e.g.:
+		 *   "https://<your-project>.pages.dev"
+		 * Multiple origins must be comma-separated. Wildcards (*) are strictly rejected.
+		 *
+		 * Configure in production:
+		 *   - via Cloudflare Dashboard: Workers & Pages > worker > Settings > Variables and Secrets
+		 *   - or via wrangler.jsonc env.production.vars
+		 */
+		"ADMIN_ORIGINS": "http://localhost:5173",
+		"COOKIE_SAME_SITE": "Lax",
+		"COOKIE_NAME": "tapme_session"
+	},
 	"upload_source_maps": true,
 	"d1_databases": [
 		{
@@ -27,49 +39,21 @@
 	],
 
 	"ratelimits": [
-  {
-    "name": "AUTH_IP_LIMITER",
-    "namespace_id": "78101",
-    "simple": {
-      "limit": 10,
-      "period": 60
-    }
-  },
-  {
-    "name": "AUTH_ACCOUNT_LIMITER",
-    "namespace_id": "78102",
-    "simple": {
-      "limit": 5,
-      "period": 60
-    }
-  }
-]
-	/**
-	 * Smart Placement
-	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
-	 */
-	// "placement": {  "mode": "smart" }
-	/**
-	 * Bindings
-	 * Bindings allow your Worker to interact with resources on the Cloudflare Developer Platform, including
-	 * databases, object storage, AI inference, real-time communication and more.
-	 * https://developers.cloudflare.com/workers/runtime-apis/bindings/
-	 */
-	/**
-	 * Environment Variables
-	 * https://developers.cloudflare.com/workers/wrangler/configuration/#environment-variables
-	 * Note: Use secrets to store sensitive data.
-	 * https://developers.cloudflare.com/workers/configuration/secrets/
-	 */
-	// "vars": {  "MY_VARIABLE": "production_value" }
-	/**
-	 * Static Assets
-	 * https://developers.cloudflare.com/workers/static-assets/binding/
-	 */
-	// "assets": {  "directory": "./public/",  "binding": "ASSETS" }
-	/**
-	 * Service Bindings (communicate between multiple Workers)
-	 * https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
-	 */
-	// "services": [  {   "binding": "MY_SERVICE",   "service": "my-service"  } ]
+		{
+			"name": "AUTH_IP_LIMITER",
+			"namespace_id": "78101",
+			"simple": {
+				"limit": 10,
+				"period": 60
+			}
+		},
+		{
+			"name": "AUTH_ACCOUNT_LIMITER",
+			"namespace_id": "78102",
+			"simple": {
+				"limit": 5,
+				"period": 60
+			}
+		}
+	]
 }

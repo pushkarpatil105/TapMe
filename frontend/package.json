@@ -7,9 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "test": "node --test src/utils/qr-generator.test.js src/utils/pages-proxy.test.js",
     "preview": "vite preview"
   },
   "dependencies": {
+    "qrcode": "^1.5.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
@@ -22,6 +24,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.7",
     "globals": "^17.13.0",
+    "jsqr": "^1.4.0",
     "vite": "^8.3.5"
   }
 }
