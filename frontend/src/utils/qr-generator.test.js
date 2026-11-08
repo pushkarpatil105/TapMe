@@ -5,6 +5,7 @@ import QRCode from 'qrcode'
 import { getQRLogoForCard, QR_LOGOS } from '../assets/qr-logos.js'
 import {
   getPublicCardUrl,
+  copyPublicCardUrl,
   isLocalDevelopmentUrl,
   isLanOrLocalAddress,
   validatePublicRedirectBaseUrl,
@@ -433,6 +434,40 @@ describe('TapMe Phase 4 Batch 2 - QR Generator & Exporters Test Suite', () => {
 
       assert(decoded, 'Clean All-In-One QR barcode must successfully decode')
       assert.strictEqual(decoded.data, url)
+    })
+  })
+
+  describe('12. Public URL Copying & Clipboard Robustness (Stage B)', () => {
+    it('successfully copies canonical public card redirect URL using Clipboard API', async () => {
+      let writtenText = ''
+      const mockClipboard = {
+        writeText: async (text) => {
+          writtenText = text
+        },
+      }
+
+      const res = await copyPublicCardUrl('token_test_12345', mockClipboard)
+      assert.strictEqual(res.success, true)
+      assert.strictEqual(res.url, 'https://tapme-ayd.pages.dev/r/token_test_12345')
+      assert.strictEqual(writtenText, 'https://tapme-ayd.pages.dev/r/token_test_12345')
+    })
+
+    it('gracefully handles clipboard failure and reports clean error without crashing', async () => {
+      const failingClipboard = {
+        writeText: async () => {
+          throw new Error('NotAllowedError: Permission denied')
+        },
+      }
+
+      const res = await copyPublicCardUrl('token_fail_999', failingClipboard)
+      assert.strictEqual(res.success, false)
+      assert.match(res.error, /Permission denied/i)
+    })
+
+    it('rejects empty or missing public tokens safely', async () => {
+      const res = await copyPublicCardUrl('')
+      assert.strictEqual(res.success, false)
+      assert.match(res.error, /valid publicToken is required/i)
     })
   })
 })

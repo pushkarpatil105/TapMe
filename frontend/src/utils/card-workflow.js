@@ -45,6 +45,14 @@ export const QR_TYPE_OPTIONS = [
   { value: 'whatsapp', label: 'WhatsApp' },
 ]
 
+export const CARD_TYPE_FILTER_OPTIONS = [
+  { value: '', label: 'All Cards' },
+  { value: 'instagram', label: 'Instagram' },
+  { value: 'google_review', label: 'Google Reviews' },
+  { value: 'whatsapp', label: 'WhatsApp' },
+  { value: 'all_in_one', label: 'Multi-link' },
+]
+
 export const PLATFORM_OPTIONS = [
   {
     value: 'google_reviews',
@@ -233,6 +241,216 @@ export function formatEditCardPayload({ businessName, location, links }) {
       is_enabled: Boolean(l.is_enabled),
       display_order: idx,
     })),
+  }
+}
+
+/**
+ * Resolves the visual card type badge, label, and style class for an inventory card record.
+ * Uses immutable qr_type and configured destination links without inferring from name.
+ *
+ * @param {Object} card - Card inventory record
+ * @returns {{ type: string, label: string, badgeClass: string }}
+ */
+export function getCardTypeBadge(card) {
+  if (!card) {
+    return { type: 'unknown', label: 'Card', badgeClass: 'card-type-default' }
+  }
+
+  const qrType = (card.qr_type || '').toLowerCase()
+  const links = Array.isArray(card.links)
+    ? card.links
+    : Array.isArray(card.card_links)
+    ? card.card_links
+    : []
+
+  if (qrType === 'all_in_one' || links.length > 1) {
+    return {
+      type: 'all_in_one',
+      label: 'Multi-link',
+      badgeClass: 'card-type-multilink',
+    }
+  }
+
+  if (qrType === 'google_review' || (links.length === 1 && links[0]?.platform === 'google_reviews')) {
+    return {
+      type: 'google_review',
+      label: 'Google Reviews',
+      badgeClass: 'card-type-googlereviews',
+    }
+  }
+
+  if (qrType === 'instagram' || (links.length === 1 && links[0]?.platform === 'instagram')) {
+    return {
+      type: 'instagram',
+      label: 'Instagram',
+      badgeClass: 'card-type-instagram',
+    }
+  }
+
+  if (qrType === 'whatsapp' || (links.length === 1 && links[0]?.platform === 'whatsapp')) {
+    return {
+      type: 'whatsapp',
+      label: 'WhatsApp',
+      badgeClass: 'card-type-whatsapp',
+    }
+  }
+
+  return {
+    type: qrType || 'unknown',
+    label: QR_TYPE_CONFIG[qrType]?.label || 'Card',
+    badgeClass: 'card-type-default',
+  }
+}
+
+/**
+ * Checks if a card matches the specified card type filter.
+ *
+ * @param {Object} card - Card inventory record
+ * @param {string} typeFilter - Filter value ('', 'instagram', 'google_review', 'whatsapp', 'all_in_one')
+ * @returns {boolean}
+ */
+export function matchesCardType(card, typeFilter) {
+  if (!typeFilter || typeFilter === 'all' || typeFilter === '') {
+    return true
+  }
+  if (!card) return false
+
+  const qrType = (card.qr_type || '').toLowerCase()
+  const links = Array.isArray(card.links)
+    ? card.links
+    : Array.isArray(card.card_links)
+    ? card.card_links
+    : []
+
+  if (typeFilter === 'all_in_one') {
+    return qrType === 'all_in_one' || links.length > 1
+  }
+
+  if (typeFilter === 'google_review') {
+    return qrType === 'google_review' || links.some((l) => l?.platform === 'google_reviews')
+  }
+
+  if (typeFilter === 'instagram') {
+    return qrType === 'instagram' || links.some((l) => l?.platform === 'instagram')
+  }
+
+  if (typeFilter === 'whatsapp') {
+    return qrType === 'whatsapp' || links.some((l) => l?.platform === 'whatsapp')
+  }
+
+  return qrType === typeFilter
+}
+
+/**
+ * Filters an array of card records using partial, case-insensitive matching
+ * across business_name, location, card_number, and formatted_card_number,
+ * and optionally filters by card type.
+ *
+ * @param {Array<Object>} cards - List of card records
+ * @param {string} searchQuery - Search query string
+ * @param {string} [typeFilter=''] - Optional card type filter identifier
+ * @returns {Array<Object>} Filtered cards array
+ */
+export function filterCards(cards, searchQuery, typeFilter = '') {
+  if (!Array.isArray(cards)) return []
+
+  const hasSearch = typeof searchQuery === 'string' && searchQuery.trim().length > 0
+  const q = hasSearch ? searchQuery.trim().toLowerCase() : ''
+  const cleanNumQuery = q.startsWith('#') ? q.slice(1).trim() : q
+  const hasTypeFilter = Boolean(typeFilter && typeFilter !== 'all')
+
+  if (!hasSearch && !hasTypeFilter) {
+    return [...cards]
+  }
+
+  return cards.filter((card) => {
+    if (!card) return false
+
+    // 1. Check card type filter if active
+    if (hasTypeFilter && !matchesCardType(card, typeFilter)) {
+      return false
+    }
+
+    // 2. Check search query if active
+    if (!hasSearch) return true
+
+    const name = (card.business_name || '').toLowerCase()
+    if (name.includes(q)) return true
+
+    const loc = (card.location || '').toLowerCase()
+    if (loc.includes(q)) return true
+
+    const numStr = String(card.card_number ?? '')
+    if (numStr === q || numStr.includes(cleanNumQuery)) return true
+
+    const formattedNum = (card.formatted_card_number || '').toLowerCase()
+    if (formattedNum.includes(q) || formattedNum.includes(cleanNumQuery)) return true
+
+    return false
+  })
+}
+
+/**
+ * Sorts an array of card records without mutating the input array.
+ * Supports:
+ * - 'created_desc' (Default): Newest first
+ * - 'created_asc': Oldest first
+ * - 'name_asc': Business name A to Z
+ * - 'name_desc': Business name Z to A
+ * - 'number_asc': Card number numeric ascending (1, 2, 10)
+ * - 'number_desc': Card number numeric descending (10, 2, 1)
+ *
+ * @param {Array<Object>} cards - List of card records
+ * @param {string} sortBy - Sort key identifier
+ * @returns {Array<Object>} Sorted copy of cards
+ */
+export function sortCards(cards, sortBy = 'created_desc') {
+  if (!Array.isArray(cards)) return []
+  const copy = [...cards]
+
+  switch (sortBy) {
+    case 'created_asc':
+      return copy.sort((a, b) => {
+        const timeA = a?.created_at ? new Date(a.created_at).getTime() : 0
+        const timeB = b?.created_at ? new Date(b.created_at).getTime() : 0
+        return timeA - timeB
+      })
+
+    case 'name_asc':
+      return copy.sort((a, b) => {
+        const nameA = a?.business_name || ''
+        const nameB = b?.business_name || ''
+        return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' })
+      })
+
+    case 'name_desc':
+      return copy.sort((a, b) => {
+        const nameA = a?.business_name || ''
+        const nameB = b?.business_name || ''
+        return nameB.localeCompare(nameA, undefined, { sensitivity: 'base' })
+      })
+
+    case 'number_asc':
+      return copy.sort((a, b) => {
+        const numA = Number(a?.card_number) || 0
+        const numB = Number(b?.card_number) || 0
+        return numA - numB
+      })
+
+    case 'number_desc':
+      return copy.sort((a, b) => {
+        const numA = Number(a?.card_number) || 0
+        const numB = Number(b?.card_number) || 0
+        return numB - numA
+      })
+
+    case 'created_desc':
+    default:
+      return copy.sort((a, b) => {
+        const timeA = a?.created_at ? new Date(a.created_at).getTime() : 0
+        const timeB = b?.created_at ? new Date(b.created_at).getTime() : 0
+        return timeB - timeA
+      })
   }
 }
 

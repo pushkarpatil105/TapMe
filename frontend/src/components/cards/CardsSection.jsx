@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from '../../context'
 import { CardsTable } from './CardsTable'
 import { CreateCardModal } from './CreateCardModal'
@@ -6,6 +6,9 @@ import { CardDetailsModal } from './CardDetailsModal'
 import { EditCardModal } from './EditCardModal'
 import { ConfirmationModal } from './ConfirmationModal'
 import { ScanCardModal } from './ScanCardModal'
+import { filterCards, sortCards } from '../../utils/card-workflow'
+
+const PAGE_SIZE = 10
 
 export function CardsSection() {
   const { user, logout } = useAuth()
@@ -13,12 +16,10 @@ export function CardsSection() {
 
   const [cards, setCards] = useState([])
   const [statusFilter, setStatusFilter] = useState('')
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 10,
-    total: 0,
-    total_pages: 1,
-  })
+  const [typeFilter, setTypeFilter] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortBy, setSortBy] = useState('created_desc')
+  const [currentPage, setCurrentPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [successBanner, setSuccessBanner] = useState(null)
@@ -38,7 +39,7 @@ export function CardsSection() {
   })
 
   const fetchCards = useCallback(
-    async (pageToLoad = 1, currentFilter = statusFilter) => {
+    async (currentFilter = statusFilter) => {
       try {
         setLoading(true)
         setError(null)
@@ -46,8 +47,9 @@ export function CardsSection() {
         const filterQuery = currentFilter
           ? `&status=${encodeURIComponent(currentFilter)}`
           : ''
+        // Fetch up to 100 cards from backend within worker safe limit for client-side search & sort
         const response = await fetch(
-          `/api/cards?page=${pageToLoad}&limit=10${filterQuery}`,
+          `/api/cards?page=1&limit=100${filterQuery}`,
           {
             method: 'GET',
             credentials: 'include',
@@ -66,14 +68,6 @@ export function CardsSection() {
 
         if (response.ok && json?.success && json?.data) {
           setCards(json.data.cards || [])
-          setPagination(
-            json.data.pagination || {
-              page: pageToLoad,
-              limit: 10,
-              total: 0,
-              total_pages: 1,
-            }
-          )
         } else {
           setError(json?.error || 'Failed to load cards.')
         }
@@ -90,7 +84,7 @@ export function CardsSection() {
   useEffect(() => {
     let isMounted = true
 
-    fetch('/api/cards?page=1&limit=10', {
+    fetch('/api/cards?page=1&limit=100', {
       method: 'GET',
       credentials: 'include',
       headers: {
@@ -108,14 +102,6 @@ export function CardsSection() {
         if (!isMounted || !json) return
         if (json.success && json.data) {
           setCards(json.data.cards || [])
-          setPagination(
-            json.data.pagination || {
-              page: 1,
-              limit: 10,
-              total: 0,
-              total_pages: 1,
-            }
-          )
         } else {
           setError(json?.error || 'Failed to load cards.')
         }
@@ -138,22 +124,56 @@ export function CardsSection() {
 
   const handleStatusFilterChange = (newFilter) => {
     setStatusFilter(newFilter)
-    fetchCards(1, newFilter)
+    setCurrentPage(1)
+    fetchCards(newFilter)
+  }
+
+  const handleTypeFilterChange = (newType) => {
+    setTypeFilter(newType)
+    setCurrentPage(1)
+  }
+
+  const handleSearchChange = (newQuery) => {
+    setSearchQuery(newQuery)
+    setCurrentPage(1)
+  }
+
+  const handleSortChange = (newSort) => {
+    setSortBy(newSort)
+    setCurrentPage(1)
   }
 
   const handlePageChange = (newPage) => {
-    fetchCards(newPage, statusFilter)
+    setCurrentPage(newPage)
   }
 
   const handleRefresh = () => {
-    fetchCards(pagination.page, statusFilter)
+    fetchCards(statusFilter)
   }
+
+  // Reactive filtering and non-mutating sorting
+  const filteredCards = useMemo(() => {
+    return filterCards(cards, searchQuery, typeFilter)
+  }, [cards, searchQuery, typeFilter])
+
+  const sortedCards = useMemo(() => {
+    return sortCards(filteredCards, sortBy)
+  }, [filteredCards, sortBy])
+
+  const totalFilteredCount = sortedCards.length
+  const totalPages = Math.max(1, Math.ceil(totalFilteredCount / PAGE_SIZE))
+  const safePage = Math.min(currentPage, totalPages)
+
+  const pagedCards = useMemo(() => {
+    const start = (safePage - 1) * PAGE_SIZE
+    return sortedCards.slice(start, start + PAGE_SIZE)
+  }, [sortedCards, safePage])
 
   const handleCardCreated = (newCard) => {
     setSuccessBanner(
       `Card #${newCard.formatted_card_number || newCard.card_number} created for "${newCard.business_name}".`
     )
-    fetchCards(1, statusFilter)
+    fetchCards(statusFilter)
   }
 
   const handleCardUpdated = (updatedCard) => {
@@ -162,7 +182,7 @@ export function CardsSection() {
     setSuccessBanner(
       `Card #${updatedCard.formatted_card_number || updatedCard.card_number} updated successfully.`
     )
-    fetchCards(pagination.page, statusFilter)
+    fetchCards(statusFilter)
   }
 
   const handleOpenEdit = async (cardNumber) => {
@@ -250,7 +270,7 @@ export function CardsSection() {
         // If details modal was open for this card, close or update
         setViewingCardId(null)
         // Refresh cards
-        fetchCards(pagination.page, statusFilter)
+        fetchCards(statusFilter)
       } else {
         alert(json?.error || `Failed to ${action} card.`)
         setLifecycleModal((prev) => ({ ...prev, loading: false }))
@@ -286,14 +306,68 @@ export function CardsSection() {
         </div>
       )}
 
-      {/* Main Table */}
+      {/* 1. High-Priority Prominent Card Scanner Hero */}
+      <div className="cards-scanner-hero" role="region" aria-label="Card Scanner Action">
+        <div className="scanner-hero-body">
+          <div className="scanner-hero-icon-pill" aria-hidden="true">
+            <svg
+              className="scanner-hero-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="3" y="3" width="7" height="7" />
+              <rect x="14" y="3" width="7" height="7" />
+              <rect x="14" y="14" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" />
+            </svg>
+          </div>
+          <div className="scanner-hero-text">
+            <h3 className="scanner-hero-title">Smart Card &amp; QR Scanner</h3>
+            <p className="scanner-hero-desc">
+              Scan or look up any NFC smart business card or QR code to verify destination links, view scan analytics, or configure blank preprinted cards.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          className="scanner-hero-btn"
+          onClick={() => setIsScanning(true)}
+          aria-label="Open Card Scanner"
+        >
+          <svg className="btn-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path
+              fillRule="evenodd"
+              d="M3 4a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm2 2V5h1v1H5zM3 13a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1v-3zm2 2v-1h1v1H5zM13 3a1 1 0 00-1 1v3a1 1 0 001 1h3a1 1 0 001-1V4a1 1 0 00-1-1h-3zm1 2v1h1V5h-1z"
+              clipRule="evenodd"
+            />
+            <path d="M11 12a1 1 0 011-1h1a1 1 0 011 1v1a1 1 0 01-1 1h-1a1 1 0 01-1-1v-1zm4 0a1 1 0 011-1h1a1 1 0 011 1v1a1 1 0 01-1 1h-1a1 1 0 01-1-1v-1zm-4 4a1 1 0 011-1h1a1 1 0 011 1v1a1 1 0 01-1 1h-1a1 1 0 01-1-1v-1zm4 0a1 1 0 011-1h1a1 1 0 011 1v1a1 1 0 01-1 1h-1a1 1 0 01-1-1v-1z" />
+          </svg>
+          <span>Launch Scanner</span>
+        </button>
+      </div>
+
+      {/* Main Table & Inventory Toolbar */}
       <CardsTable
-        cards={cards}
-        pagination={pagination}
+        cards={pagedCards}
+        totalCount={totalFilteredCount}
+        rawCount={cards.length}
+        currentPage={safePage}
+        totalPages={totalPages}
+        pageSize={PAGE_SIZE}
         loading={loading}
         error={error}
         statusFilter={statusFilter}
         onStatusFilterChange={handleStatusFilterChange}
+        typeFilter={typeFilter}
+        onTypeFilterChange={handleTypeFilterChange}
+        searchQuery={searchQuery}
+        onSearchChange={handleSearchChange}
+        sortBy={sortBy}
+        onSortChange={handleSortChange}
         onPageChange={handlePageChange}
         onViewCard={(cardNum) => setViewingCardId(cardNum)}
         onEditCard={(cardNum) => handleOpenEdit(cardNum)}

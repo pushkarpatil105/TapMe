@@ -346,7 +346,8 @@ export function ScanCardModal({ onClose, onConfigureCard, onEditCard, isMainAdmi
             </div>
             <button
               type="button"
-              className="text-slate-400 hover:text-white ml-2 text-sm"
+              className="ml-2 text-sm opacity-70 hover:opacity-100 transition-opacity"
+              style={{ color: 'inherit' }}
               onClick={() => setScanError(null)}
               aria-label="Dismiss error"
             >
@@ -626,14 +627,14 @@ export function ScanCardModal({ onClose, onConfigureCard, onEditCard, isMainAdmi
               <div className="result-details-grid mt-4">
                 <div className="detail-item">
                   <span className="detail-label">Business Name</span>
-                  <span className="detail-value font-medium text-white">
+                  <span className="detail-value font-medium" style={{ color: 'var(--color-text-main)' }}>
                     {identifiedCard.business_name || '—'}
                   </span>
                 </div>
 
                 <div className="detail-item">
                   <span className="detail-label">Location</span>
-                  <span className="detail-value text-slate-300">
+                  <span className="detail-value" style={{ color: 'var(--color-text-muted)' }}>
                     {identifiedCard.location || '—'}
                   </span>
                 </div>

@@ -1,4 +1,4 @@
-import { AuthProvider, useAuth } from './context'
+import { AuthProvider, useAuth, ThemeProvider } from './context'
 import { LoginPage } from './components/LoginPage'
 import { Dashboard } from './components/Dashboard'
 import { LoadingScreen } from './components/LoadingScreen'
@@ -20,8 +20,10 @@ function AuthFlow() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AuthFlow />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AuthFlow />
+      </AuthProvider>
+    </ThemeProvider>
   )
 }

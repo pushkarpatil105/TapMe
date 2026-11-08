@@ -188,11 +188,11 @@ export function AuditSection() {
       {/* Top Header & Overview */}
       <div className="section-header-row mb-4">
         <div>
-          <h2 className="section-title text-xl font-bold text-white flex items-center gap-2">
+          <h2 className="section-title text-xl font-bold flex items-center gap-2" style={{ color: 'var(--color-text-main)' }}>
             <span>Audit History</span>
             <span className="timezone-pill">Asia/Kolkata (IST)</span>
           </h2>
-          <p className="section-subtitle text-xs text-slate-400 mt-0.5">
+          <p className="section-subtitle text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
             Append-only audit trail recording card creation, configuration, status lifecycle changes, and staff operations.
           </p>
         </div>
@@ -331,16 +331,16 @@ export function AuditSection() {
       {/* Pagination Controls */}
       {!loading && !error && pagination.total > 0 && (
         <div className="pagination-bar mt-4">
-          <div className="pagination-info text-xs text-slate-400">
+          <div className="pagination-info text-xs" style={{ color: 'var(--color-text-muted)' }}>
             Showing{' '}
-            <strong className="text-white">
+            <strong style={{ color: 'var(--color-text-main)' }}>
               {(pagination.page - 1) * pagination.limit + 1}
             </strong>{' '}
             to{' '}
-            <strong className="text-white">
+            <strong style={{ color: 'var(--color-text-main)' }}>
               {Math.min(pagination.page * pagination.limit, pagination.total)}
             </strong>{' '}
-            of <strong className="text-white">{pagination.total}</strong> records
+            of <strong style={{ color: 'var(--color-text-main)' }}>{pagination.total}</strong> records
           </div>
 
           <div className="pagination-actions flex items-center gap-1.5">

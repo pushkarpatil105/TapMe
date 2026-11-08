@@ -491,7 +491,7 @@ export function StorageSection() {
                   <span className="metric-label">Measured Payload</span>
                   <span className="metric-tag metric-tag-amber">Free Tier</span>
                 </div>
-                <div className="metric-value-huge" style={{ color: '#fbbf24' }}>
+                <div className="metric-value-huge" style={{ color: 'var(--color-amber)' }}>
                   {storageData.formatted_payload_sizes.total_measured}
                 </div>
                 <div className="metric-subtext">
@@ -510,6 +510,7 @@ export function StorageSection() {
                   viewBox="0 0 20 20"
                   fill="currentColor"
                   aria-hidden="true"
+                  style={{ width: '18px', height: '18px', minWidth: '18px', minHeight: '18px', maxWidth: '18px', maxHeight: '18px', flexShrink: 0 }}
                 >
                   <path
                     fillRule="evenodd"
@@ -526,10 +527,10 @@ export function StorageSection() {
                 <p>
                   <strong>Unmeasurable Physical Storage:</strong> Cloudflare D1 strictly blocks SQLite <code>PRAGMA page_count</code> and <code>PRAGMA page_size</code> queries (returning <code>not authorized: SQLITE_AUTH</code>). Physical B-tree page allocation, fragmentation, and OS-level file storage are managed exclusively by Cloudflare infrastructure.
                 </p>
-                <p style={{ color: '#fde68a' }}>
+                <p style={{ color: 'var(--color-amber)' }}>
                   <strong>Freelist Space vs Physical File Shrinkage:</strong> Deleting database rows moves SQLite pages to the database internal freelist for reuse by future row insertions; it does not automatically reduce physical file size on disk without an explicit <code>VACUUM</code> operation.
                 </p>
-                <p style={{ color: '#94a3b8' }}>
+                <p style={{ color: 'var(--color-text-muted)' }}>
                   <strong>Disk Storage vs Worker Ephemeral RAM:</strong> D1 persistent database storage and Cloudflare Worker ephemeral RAM (128 MB) are entirely separate resources. Cleanup operations free database capacity, but do not alter Worker RAM.
                 </p>
               </div>
@@ -770,9 +771,9 @@ export function StorageSection() {
                 </div>
 
                 {/* Sub-Panel 2A: Audit Logs Retention */}
-                <div style={{ background: 'rgba(0, 0, 0, 0.25)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: 'var(--radius-sm)', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ background: 'var(--color-surface-secondary)', border: '1px solid var(--color-card-border)', borderRadius: 'var(--radius-sm)', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                    <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#e2e8f0', textTransform: 'uppercase', letterSpacing: '0.6px', margin: 0 }}>
+                    <h4 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-main)', textTransform: 'uppercase', letterSpacing: '0.6px', margin: 0 }}>
                       Audit Logs Retention
                     </h4>
                     <span style={{ fontSize: '12px', color: 'var(--color-text-dim)' }}>
@@ -816,9 +817,9 @@ export function StorageSection() {
                 </div>
 
                 {/* Sub-Panel 2B: Scan Events Retention */}
-                <div style={{ background: 'rgba(0, 0, 0, 0.25)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: 'var(--radius-sm)', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ background: 'var(--color-surface-secondary)', border: '1px solid var(--color-card-border)', borderRadius: 'var(--radius-sm)', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                    <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#e2e8f0', textTransform: 'uppercase', letterSpacing: '0.6px', margin: 0 }}>
+                    <h4 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-main)', textTransform: 'uppercase', letterSpacing: '0.6px', margin: 0 }}>
                       Scan Events Retention
                     </h4>
                     <span style={{ fontSize: '12px', color: 'var(--color-text-dim)' }}>
@@ -869,7 +870,7 @@ export function StorageSection() {
                 <div className="modal-container" style={{ maxWidth: '600px' }} role="dialog" aria-modal="true">
                   <div className="modal-header">
                     <div>
-                      <h3 className="modal-title" style={{ color: '#fda4af' }}>
+                      <h3 className="modal-title" style={{ color: 'var(--color-rose)' }}>
                         Confirm Audit Log Retention Cleanup
                       </h3>
                       <p style={{ fontSize: '12.5px', color: 'var(--color-text-muted)', margin: 0 }}>
@@ -886,7 +887,7 @@ export function StorageSection() {
                   </div>
 
                   <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    <div style={{ padding: '12px 14px', background: 'rgba(244, 63, 94, 0.12)', border: '1px solid rgba(244, 63, 94, 0.3)', borderRadius: 'var(--radius-sm)', fontSize: '12.5px', color: '#fecdd3', lineHeight: 1.5 }}>
+                    <div style={{ padding: '12px 14px', background: 'var(--color-rose-bg)', border: '1px solid var(--color-rose-border)', borderRadius: 'var(--radius-sm)', fontSize: '12.5px', color: 'var(--color-rose)', lineHeight: 1.5 }}>
                       <strong>Warning:</strong> Deleting historical records cannot be undone. Cards, destination links, staff accounts, and sessions are permanent and completely safe from cleanup operations.
                     </div>
 
@@ -924,8 +925,8 @@ export function StorageSection() {
                     </div>
 
                     <div className="confirm-input-box">
-                      <label style={{ fontSize: '12.5px', fontWeight: 600, color: '#f1f5f9' }}>
-                        To confirm deletion, type <span style={{ fontFamily: 'var(--font-mono)', color: '#f43f5e', fontWeight: 800 }}>CONFIRM DELETE</span> below:
+                      <label style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--color-text-main)' }}>
+                        To confirm deletion, type <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-rose)', fontWeight: 800 }}>CONFIRM DELETE</span> below:
                       </label>
                       <input
                         type="text"
@@ -967,7 +968,7 @@ export function StorageSection() {
                 <div className="modal-container" style={{ maxWidth: '600px' }} role="dialog" aria-modal="true">
                   <div className="modal-header">
                     <div>
-                      <h3 className="modal-title" style={{ color: '#fda4af' }}>
+                      <h3 className="modal-title" style={{ color: 'var(--color-rose)' }}>
                         Confirm Scan Events Retention Cleanup
                       </h3>
                       <p style={{ fontSize: '12.5px', color: 'var(--color-text-muted)', margin: 0 }}>
@@ -984,7 +985,7 @@ export function StorageSection() {
                   </div>
 
                   <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    <div style={{ padding: '12px 14px', background: 'rgba(244, 63, 94, 0.12)', border: '1px solid rgba(244, 63, 94, 0.3)', borderRadius: 'var(--radius-sm)', fontSize: '12.5px', color: '#fecdd3', lineHeight: 1.5 }}>
+                    <div style={{ padding: '12px 14px', background: 'var(--color-rose-bg)', border: '1px solid var(--color-rose-border)', borderRadius: 'var(--radius-sm)', fontSize: '12.5px', color: 'var(--color-rose)', lineHeight: 1.5 }}>
                       <strong>Notice:</strong> This deletes historical visitor scan timestamps. Physical smart card configurations, public tokens, and redirect destinations are permanent and will not be altered.
                     </div>
 
@@ -1022,8 +1023,8 @@ export function StorageSection() {
                     </div>
 
                     <div className="confirm-input-box">
-                      <label style={{ fontSize: '12.5px', fontWeight: 600, color: '#f1f5f9' }}>
-                        To confirm deletion, type <span style={{ fontFamily: 'var(--font-mono)', color: '#f43f5e', fontWeight: 800 }}>CONFIRM DELETE</span> below:
+                      <label style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--color-text-main)' }}>
+                        To confirm deletion, type <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-rose)', fontWeight: 800 }}>CONFIRM DELETE</span> below:
                       </label>
                       <input
                         type="text"

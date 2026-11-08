@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { QRCodeDisplay } from './QRCodeDisplay'
-import { QR_TYPE_CONFIG } from '../../utils/card-workflow'
+import { QR_TYPE_CONFIG, getCardTypeBadge } from '../../utils/card-workflow'
 
 export function CardDetailsModal({
   cardId,
@@ -153,7 +153,7 @@ export function CardDetailsModal({
                 </div>
                 <div className="details-item">
                   <span className="details-label">Location</span>
-                  <span className="details-value text-muted">{card.location || '—'}</span>
+                  <span className="details-value text-muted">{card.location || 'No location specified'}</span>
                 </div>
                 <div className="details-item">
                   <span className="details-label">Status</span>
@@ -165,9 +165,14 @@ export function CardDetailsModal({
                 </div>
                 <div className="details-item">
                   <span className="details-label">Permanent QR Type</span>
-                  <span className="details-value font-medium text-main">
-                    {QR_TYPE_CONFIG[card.qr_type]?.label || card.qr_type}
-                  </span>
+                  <div className="details-type-badge-wrap">
+                    <span className={`card-type-badge ${getCardTypeBadge(card).badgeClass}`}>
+                      {getCardTypeBadge(card).label}
+                    </span>
+                    <span className="text-xs text-muted">
+                      ({QR_TYPE_CONFIG[card.qr_type]?.label || card.qr_type})
+                    </span>
+                  </div>
                 </div>
               </div>
 

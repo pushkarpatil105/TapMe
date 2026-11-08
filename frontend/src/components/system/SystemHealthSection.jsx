@@ -164,17 +164,17 @@ export function SystemHealthSection() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <span className={`status-pulse-dot ${overallBadge.dotClass}`} />
                   <div>
-                    <h3 style={{ fontSize: '17px', fontWeight: 700, color: '#ffffff', margin: 0, letterSpacing: '0.2px' }}>
+                    <h3 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--color-text-main)', margin: 0, letterSpacing: '0.2px' }}>
                       Overall System: {overallBadge.label}
                     </h3>
-                    <p style={{ fontSize: '13px', color: '#cbd5e1', margin: '4px 0 0 0' }}>
+                    <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '4px 0 0 0' }}>
                       All critical dependencies verified, including Cloudflare Worker edge execution and D1 query engine.
                     </p>
                   </div>
                 </div>
 
-                <div style={{ textAlign: 'right', fontSize: '12.5px', color: '#cbd5e1', fontFamily: 'var(--font-mono)' }}>
-                  <div>Checked: <strong style={{ color: '#ffffff' }}>{formatSystemDateTime(healthData.timestamp)}</strong></div>
+                <div style={{ textAlign: 'right', fontSize: '12.5px', color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}>
+                  <div>Checked: <strong style={{ color: 'var(--color-text-main)' }}>{formatSystemDateTime(healthData.timestamp)}</strong></div>
                   <div style={{ fontSize: '11.5px', color: 'var(--color-text-dim)', marginTop: '2px' }}>
                     Environment: <span style={{ textTransform: 'uppercase', fontWeight: 700, color: '#38bdf8' }}>{healthData.worker.environment}</span>
                   </div>
@@ -208,13 +208,13 @@ export function SystemHealthSection() {
                 </p>
               </div>
               <div className="storage-notice-footer">
-                <span>Buffer Limit: <strong style={{ color: '#ffffff' }}>100 Events</strong></span>
+                <span>Buffer Limit: <strong style={{ color: 'var(--color-text-main)' }}>100 Events</strong></span>
                 <span>•</span>
-                <span>Storage: <strong style={{ color: '#ffffff' }}>Current Worker Isolate RAM</strong></span>
+                <span>Storage: <strong style={{ color: 'var(--color-text-main)' }}>Current Worker Isolate RAM</strong></span>
                 <span>•</span>
-                <span>Customer Scans: <strong style={{ color: '#34d399' }}>Persistent in D1 (scan_events)</strong></span>
+                <span>Customer Scans: <strong style={{ color: 'var(--color-emerald)' }}>Persistent in D1 (scan_events)</strong></span>
                 <span>•</span>
-                <span>Edge Sync: <strong style={{ color: '#fde68a' }}>Per-isolate (not distributed across edge nodes)</strong></span>
+                <span>Edge Sync: <strong style={{ color: 'var(--color-amber)' }}>Per-isolate (not distributed across edge nodes)</strong></span>
               </div>
             </div>
 
@@ -236,7 +236,7 @@ export function SystemHealthSection() {
                   <span className="metric-label">D1 Database</span>
                   <span className={`status-pill ${dbBadge.badgeClass}`}>{dbBadge.label}</span>
                 </div>
-                <div className="metric-value-huge" style={{ color: '#34d399' }}>
+                <div className="metric-value-huge" style={{ color: 'var(--color-emerald)' }}>
                   {healthData.database.duration_ms} ms
                 </div>
                 <div className="metric-subtext">
@@ -266,7 +266,7 @@ export function SystemHealthSection() {
                     {healthData.auth_monitoring.active_admins_count} Admins
                   </span>
                 </div>
-                <div className="metric-value-huge" style={{ fontSize: '20px', color: healthData.auth_monitoring.failed_login_attempts > 0 ? '#fbbf24' : '#ffffff' }}>
+                <div className="metric-value-huge" style={{ fontSize: '20px', color: healthData.auth_monitoring.failed_login_attempts > 0 ? 'var(--color-amber)' : 'var(--color-text-main)' }}>
                   {healthData.auth_monitoring.failed_login_attempts} Failed Attempts
                 </div>
                 <div className="metric-subtext">
@@ -278,7 +278,7 @@ export function SystemHealthSection() {
             {/* Redirect Telemetry Breakdown */}
             <div className="table-card" style={{ padding: '22px' }}>
               <div style={{ marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#ffffff', margin: 0 }}>
+                <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-main)', margin: 0 }}>
                   Customer Redirect Diagnostic Breakdown
                 </h3>
                 <p style={{ fontSize: '12.5px', color: 'var(--color-text-muted)', margin: '4px 0 0 0' }}>
@@ -289,28 +289,28 @@ export function SystemHealthSection() {
               <div className="diagnostic-grid">
                 <div className="diagnostic-stat-card">
                   <span className="diagnostic-label">Invalid Tokens</span>
-                  <span className="diagnostic-value" style={{ color: '#fb7185' }}>
+                  <span className="diagnostic-value" style={{ color: 'var(--color-rose)' }}>
                     {healthData.redirect_monitoring.failure_breakdown.invalid_tokens}
                   </span>
                 </div>
 
                 <div className="diagnostic-stat-card">
                   <span className="diagnostic-label">Cards Not Found</span>
-                  <span className="diagnostic-value" style={{ color: '#fbbf24' }}>
+                  <span className="diagnostic-value" style={{ color: 'var(--color-amber)' }}>
                     {healthData.redirect_monitoring.failure_breakdown.cards_not_found}
                   </span>
                 </div>
 
                 <div className="diagnostic-stat-card">
                   <span className="diagnostic-label">Unconfigured Card Scans</span>
-                  <span className="diagnostic-value" style={{ color: '#38bdf8' }}>
+                  <span className="diagnostic-value" style={{ color: 'var(--color-primary)' }}>
                     {healthData.redirect_monitoring.failure_breakdown.unconfigured_scans}
                   </span>
                 </div>
 
                 <div className="diagnostic-stat-card">
                   <span className="diagnostic-label">Inactive/Archived Scans</span>
-                  <span className="diagnostic-value" style={{ color: '#94a3b8' }}>
+                  <span className="diagnostic-value" style={{ color: 'var(--color-text-muted)' }}>
                     {healthData.redirect_monitoring.failure_breakdown.inactive_or_archived_scans}
                   </span>
                 </div>
@@ -321,7 +321,7 @@ export function SystemHealthSection() {
             <div className="table-card">
               <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-card-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#ffffff', margin: 0 }}>
+                  <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-main)', margin: 0 }}>
                     Recent System Events & Diagnostic Alerts
                   </h3>
                   <p style={{ fontSize: '12.5px', color: 'var(--color-text-muted)', margin: '4px 0 0 0' }}>
@@ -369,11 +369,11 @@ export function SystemHealthSection() {
                               </span>
                             </td>
                             <td>
-                              <code style={{ fontSize: '12px', color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>
+                              <code style={{ fontSize: '12px', color: 'var(--color-brand-text)', fontFamily: 'var(--font-mono)' }}>
                                 {evt.category}
                               </code>
                             </td>
-                            <td style={{ fontSize: '13px', color: '#e2e8f0' }}>
+                            <td style={{ fontSize: '13px', color: 'var(--color-text-main)' }}>
                               {evt.message}
                             </td>
                             <td style={{ textAlign: 'right' }}>
@@ -418,8 +418,8 @@ export function SystemHealthSection() {
                     </button>
                   </div>
                   <div className="modal-body">
-                    <div style={{ marginBottom: '14px', fontSize: '13px', color: '#cbd5e1', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <div><strong>Category:</strong> <code style={{ color: '#38bdf8' }}>{selectedEvent.category}</code></div>
+                    <div style={{ marginBottom: '14px', fontSize: '13px', color: 'var(--color-text-muted)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <div><strong>Category:</strong> <code style={{ color: 'var(--color-brand-text)' }}>{selectedEvent.category}</code></div>
                       <div><strong>Timestamp (IST):</strong> {formatSystemDateTime(selectedEvent.timestamp)}</div>
                       <div><strong>Message:</strong> {selectedEvent.message}</div>
                     </div>

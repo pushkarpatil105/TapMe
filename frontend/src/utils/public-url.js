@@ -178,3 +178,51 @@ export function isLocalDevelopmentUrl(urlString) {
     return false;
   }
 }
+
+/**
+ * Safely copies the public card redirect URL to the clipboard.
+ * Supports standard Clipboard API with fallbacks and explicit error reporting.
+ *
+ * @param {string} publicToken - The card's permanent public token.
+ * @param {Object} [customClipboard] - Optional clipboard interface for testing/mocking.
+ * @returns {Promise<{ success: boolean; url: string; error?: string }>}
+ */
+export async function copyPublicCardUrl(publicToken, customClipboard) {
+  try {
+    const url = getPublicCardUrl(publicToken);
+    const clip = customClipboard || (typeof navigator !== 'undefined' ? navigator.clipboard : null);
+
+    if (clip && typeof clip.writeText === 'function') {
+      await clip.writeText(url);
+      return { success: true, url };
+    }
+
+    // Fallback for document contexts without navigator.clipboard
+    if (typeof document !== 'undefined' && typeof document.createElement === 'function') {
+      const textarea = document.createElement('textarea');
+      textarea.value = url;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textarea);
+
+      if (successful) {
+        return { success: true, url };
+      }
+    }
+
+    return {
+      success: false,
+      url,
+      error: 'Clipboard access is unavailable. Please copy the URL manually.',
+    };
+  } catch (err) {
+    return {
+      success: false,
+      url: '',
+      error: err instanceof Error ? err.message : 'Failed to copy URL to clipboard.',
+    };
+  }
+}
