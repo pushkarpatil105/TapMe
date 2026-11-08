@@ -24,3 +24,6 @@ Thumbs.db
 
 # Local database dumps
 worker/backups/
+
+
+frontend/.wrangler/
