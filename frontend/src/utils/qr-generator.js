@@ -62,6 +62,12 @@ export async function renderQrToCanvas(canvas, payloadUrl, logo, options = {}) {
     },
   })
 
+  // If no logo is specified (e.g., all_in_one has no logo), standard clean QR is complete.
+  // Strictly avoid drawing any center white mask, quiet zone, or placeholder.
+  if (!logo || !logo.dataUri) {
+    return
+  }
+
   const ctx = canvas.getContext('2d')
   if (!ctx) {
     throw new Error('Canvas 2D context is not available.')
@@ -157,12 +163,23 @@ export async function generateQrSvgString(payloadUrl, logo, options = {}) {
   }
 
   // 1. Generate base SVG with Level H
-  const rawSvg = await QRCode.toString(payloadUrl, {
+  let rawSvg = await QRCode.toString(payloadUrl, {
     type: 'svg',
     margin,
     errorCorrectionLevel: 'H',
     color: { dark: '#000000', light: '#ffffff' },
   })
+
+  // Ensure explicit root dimensions for vector print software
+  if (!rawSvg.startsWith('<svg width=')) {
+    rawSvg = rawSvg.replace('<svg ', `<svg width="${size}" height="${size}" `)
+  }
+
+  // If no logo is specified (e.g., all_in_one), return clean standard QR SVG directly
+  // with no qr-center-logo group, no white rectangle, and no placeholder.
+  if (!logo || !logo.svg) {
+    return rawSvg.trim()
+  }
 
   // 2. Extract viewBox dimensions
   const viewBoxMatch = rawSvg.match(/viewBox=["']0 0 ([\d.]+) ([\d.]+)["']/)
@@ -179,9 +196,10 @@ export async function generateQrSvgString(payloadUrl, logo, options = {}) {
   const bgRadius = +(bgSize * 0.16).toFixed(3)
 
   // 3. Extract the inner artwork of the logo SVG
-  const innerLogoXml = logo?.svg
-    ? logo.svg.replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '').trim()
-    : ''
+  const innerLogoXml = logo.svg
+    .replace(/^<svg[^>]*>/, '')
+    .replace(/<\/svg>$/, '')
+    .trim()
 
   const logoGroup = `
   <g id="qr-center-logo">
@@ -192,13 +210,7 @@ export async function generateQrSvgString(payloadUrl, logo, options = {}) {
   </g>
 </svg>`
 
-  let finalSvg = rawSvg.replace('</svg>', logoGroup)
-
-  // Ensure explicit root dimensions for vector print software
-  if (!finalSvg.startsWith('<svg width=')) {
-    finalSvg = finalSvg.replace('<svg ', `<svg width="${size}" height="${size}" `)
-  }
-
+  const finalSvg = rawSvg.replace('</svg>', logoGroup)
   return finalSvg.trim()
 }
 

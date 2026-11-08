@@ -1,34 +1,53 @@
 import { useState } from 'react'
 import { QRCodeDisplay } from './QRCodeDisplay'
-
-const PLATFORM_OPTIONS = [
-  { value: 'google_reviews', label: 'Google Reviews', defaultLabel: 'Review Us on Google', placeholder: 'https://g.page/r/...' },
-  { value: 'instagram', label: 'Instagram', defaultLabel: 'Follow Us on Instagram', placeholder: 'https://instagram.com/username' },
-  { value: 'whatsapp', label: 'WhatsApp', defaultLabel: 'Message on WhatsApp', placeholder: 'https://wa.me/1234567890' },
-  { value: 'other', label: 'Other / Website', defaultLabel: 'Visit Our Website', placeholder: 'https://example.com' },
-]
+import {
+  QR_TYPES,
+  QR_TYPE_CONFIG,
+  QR_TYPE_OPTIONS,
+  PLATFORM_OPTIONS,
+  validateCreateCardForm,
+  formatCreateCardPayload,
+} from '../../utils/card-workflow'
 
 export function CreateCardModal({ onClose, onCardCreated }) {
   const [businessName, setBusinessName] = useState('')
   const [location, setLocation] = useState('')
-  const [links, setLinks] = useState([
-    {
-      platform: 'google_reviews',
-      destination_url: '',
-      label: 'Review Us on Google',
-      is_enabled: true,
-    },
-  ])
+  const [qrType, setQrType] = useState('all_in_one')
+  const [links, setLinks] = useState([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [createdResult, setCreatedResult] = useState(null)
 
+  const activeQrConfig = QR_TYPE_CONFIG[qrType] || QR_TYPE_CONFIG.all_in_one
+  const availablePlatforms = PLATFORM_OPTIONS.filter((p) =>
+    activeQrConfig.allowedPlatforms.includes(p.value)
+  )
+
+  const handleQrTypeChange = (newQrType) => {
+    if (!QR_TYPES.includes(newQrType)) return
+    setQrType(newQrType)
+    setErrorMessage('')
+
+    const targetConfig = QR_TYPE_CONFIG[newQrType]
+    if (links.length > 0) {
+      // Keep only links allowed by the new QR type, truncated to maxLinks
+      const compatibleLinks = links
+        .filter((l) => targetConfig.allowedPlatforms.includes(l.platform))
+        .slice(0, targetConfig.maxLinks)
+
+      setLinks(compatibleLinks)
+    }
+  }
+
   const handleAddLink = () => {
-    // Determine a sensible default platform not yet added, or fallback to 'other'
+    if (links.length >= activeQrConfig.maxLinks) {
+      return
+    }
+
     const usedPlatforms = new Set(links.map((l) => l.platform))
-    const nextAvailable = PLATFORM_OPTIONS.find(
-      (p) => p.value !== 'other' && !usedPlatforms.has(p.value)
-    ) || PLATFORM_OPTIONS[3] // 'other'
+    const nextAvailable =
+      availablePlatforms.find((p) => p.value !== 'other' && !usedPlatforms.has(p.value)) ||
+      availablePlatforms[0]
 
     setLinks([
       ...links,
@@ -51,7 +70,6 @@ export function CreateCardModal({ onClose, onCardCreated }) {
       const oldPlatformOpt = PLATFORM_OPTIONS.find((p) => p.value === updated[index].platform)
       const newPlatformOpt = PLATFORM_OPTIONS.find((p) => p.value === value)
 
-      // If user hasn't customized the label or it matches the old default, update to new default
       if (!updated[index].label || updated[index].label === oldPlatformOpt?.defaultLabel) {
         updated[index].label = newPlatformOpt?.defaultLabel || ''
       }
@@ -60,60 +78,18 @@ export function CreateCardModal({ onClose, onCardCreated }) {
     setLinks(updated)
   }
 
-  const validateForm = () => {
-    if (!businessName.trim()) {
-      return 'Business name is required.'
-    }
-    if (businessName.trim().length > 200) {
-      return 'Business name cannot exceed 200 characters.'
-    }
-    if (location.trim().length > 200) {
-      return 'Location cannot exceed 200 characters.'
-    }
-
-    const seenUrls = new Set()
-    const seenPlatforms = new Set()
-
-    for (let i = 0; i < links.length; i++) {
-      const l = links[i]
-      const url = l.destination_url.trim()
-
-      if (!url) {
-        return `Link #${i + 1} (${l.platform}) requires a destination URL.`
-      }
-
-      try {
-        const parsed = new URL(url)
-        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-          return `Link #${i + 1} URL must start with http:// or https://.`
-        }
-      } catch {
-        return `Link #${i + 1} has an invalid URL format.`
-      }
-
-      const lowerUrl = url.toLowerCase()
-      if (seenUrls.has(lowerUrl)) {
-        return `Duplicate destination URL found: "${url}". Each link must have a unique URL.`
-      }
-      seenUrls.add(lowerUrl)
-
-      if (l.platform !== 'other') {
-        if (seenPlatforms.has(l.platform)) {
-          return `Only one "${l.platform.replace('_', ' ')}" link is permitted per card.`
-        }
-        seenPlatforms.add(l.platform)
-      }
-    }
-
-    return null
-  }
-
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (isSubmitting) return
 
     setErrorMessage('')
-    const validationError = validateForm()
+    const validationError = validateCreateCardForm({
+      businessName,
+      location,
+      qrType,
+      links,
+    })
+
     if (validationError) {
       setErrorMessage(validationError)
       return
@@ -122,17 +98,12 @@ export function CreateCardModal({ onClose, onCardCreated }) {
     setIsSubmitting(true)
 
     try {
-      const payload = {
-        business_name: businessName.trim(),
-        location: location.trim() || null,
-        links: links.map((l, idx) => ({
-          platform: l.platform,
-          destination_url: l.destination_url.trim(),
-          label: l.label?.trim() || undefined,
-          is_enabled: Boolean(l.is_enabled),
-          display_order: idx,
-        })),
-      }
+      const payload = formatCreateCardPayload({
+        businessName,
+        location,
+        qrType,
+        links,
+      })
 
       const response = await fetch('/api/cards', {
         method: 'POST',
@@ -202,6 +173,12 @@ export function CreateCardModal({ onClose, onCardCreated }) {
                 <span className="created-meta-label">Business Name:</span>
                 <strong className="text-main">{createdResult.business_name}</strong>
               </div>
+              <div className="created-meta-row">
+                <span className="created-meta-label">Permanent QR Type:</span>
+                <span className="font-bold text-main">
+                  {QR_TYPE_CONFIG[createdResult.qr_type]?.label || createdResult.qr_type}
+                </span>
+              </div>
               {createdResult.location && (
                 <div className="created-meta-row">
                   <span className="created-meta-label">Location:</span>
@@ -214,7 +191,10 @@ export function CreateCardModal({ onClose, onCardCreated }) {
               </div>
               <div className="created-meta-row">
                 <span className="created-meta-label">Configured Links:</span>
-                <span className="text-muted">{createdResult.links?.length ?? 0} link(s)</span>
+                <span className="text-muted">
+                  {createdResult.links?.length ?? 0} link(s)
+                  {(!createdResult.links || createdResult.links.length === 0) && ' (Unconfigured Preprinted Card)'}
+                </span>
               </div>
             </div>
 
@@ -250,6 +230,30 @@ export function CreateCardModal({ onClose, onCardCreated }) {
                   <span>{errorMessage}</span>
                 </div>
               )}
+
+              {/* Permanent QR Type Selector */}
+              <div className="form-group">
+                <label htmlFor="create_qr_type" className="form-label">
+                  Permanent QR Type <span className="text-rose">*</span>
+                </label>
+                <select
+                  id="create_qr_type"
+                  className="form-select"
+                  value={qrType}
+                  onChange={(e) => handleQrTypeChange(e.target.value)}
+                  disabled={isSubmitting}
+                  required
+                >
+                  {QR_TYPE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-dim text-xs block mt-1">
+                  🔒 {activeQrConfig.description}. This physical QR design is permanent and cannot be modified after card creation.
+                </span>
+              </div>
 
               {/* Business Name */}
               <div className="form-group">
@@ -289,25 +293,41 @@ export function CreateCardModal({ onClose, onCardCreated }) {
 
               {/* Destination Links Section */}
               <div className="form-section-header">
-                <label className="form-label">Destination Links</label>
-                <button
-                  type="button"
-                  className="action-btn action-btn-secondary btn-sm"
-                  onClick={handleAddLink}
-                  disabled={isSubmitting || links.length >= 20}
-                >
-                  + Add Link
-                </button>
+                <div>
+                  <label className="form-label mb-0">Destination Links</label>
+                  <span className="text-dim text-xs block">
+                    {links.length}/{activeQrConfig.maxLinks} maximum for {activeQrConfig.label}
+                  </span>
+                </div>
+                {links.length < activeQrConfig.maxLinks && (
+                  <button
+                    type="button"
+                    className="action-btn action-btn-secondary btn-sm"
+                    onClick={handleAddLink}
+                    disabled={isSubmitting}
+                  >
+                    + Add Link
+                  </button>
+                )}
               </div>
 
               {links.length === 0 ? (
-                <p className="text-muted text-sm italic">
-                  No links added yet. You can add links now or later.
-                </p>
+                <div className="info-banner mb-3">
+                  <svg className="alert-icon text-muted" viewBox="0 0 20 20" fill="currentColor">
+                    <path
+                      fillRule="evenodd"
+                      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  <span>
+                    No links added. This card will be provisioned as a preprinted, unconfigured card. You can immediately download and print its permanent QR code and configure destination URLs later.
+                  </span>
+                </div>
               ) : (
                 <div className="links-editor-list">
                   {links.map((link, idx) => {
-                    const currentPlatform = PLATFORM_OPTIONS.find((p) => p.value === link.platform)
+                    const currentPlatform = availablePlatforms.find((p) => p.value === link.platform)
                     return (
                       <div key={idx} className="link-editor-card">
                         <div className="link-editor-top">
@@ -316,9 +336,9 @@ export function CreateCardModal({ onClose, onCardCreated }) {
                             className="form-select"
                             value={link.platform}
                             onChange={(e) => handleLinkChange(idx, 'platform', e.target.value)}
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || availablePlatforms.length <= 1}
                           >
-                            {PLATFORM_OPTIONS.map((opt) => (
+                            {availablePlatforms.map((opt) => (
                               <option key={opt.value} value={opt.value}>
                                 {opt.label}
                               </option>
@@ -357,7 +377,7 @@ export function CreateCardModal({ onClose, onCardCreated }) {
                           <input
                             type="text"
                             className="form-input"
-                            placeholder="Display Label (e.g. Review Us on Google)"
+                            placeholder="Display Label"
                             value={link.label}
                             onChange={(e) => handleLinkChange(idx, 'label', e.target.value)}
                             disabled={isSubmitting}

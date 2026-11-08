@@ -3,10 +3,12 @@
  *
  * Enforces strict environment boundaries:
  * - Uses `VITE_PUBLIC_REDIRECT_BASE_URL` when provided.
- * - Falls back to the Cloudflare Worker dev server (http://127.0.0.1:8787) in development.
+ * - Defaults to the canonical TapMe public redirect domain (https://tapme-ayd.pages.dev).
  * - Refuses silent localhost, loopback, or LAN IP fallbacks in production, requiring explicit public domain configuration.
  * - Ensures URLs are formatted with standard HTTP/HTTPS protocols and trimmed of trailing slashes.
  */
+
+export const CANONICAL_PUBLIC_REDIRECT_BASE_URL = 'https://tapme-ayd.pages.dev';
 
 /**
  * Checks whether a hostname corresponds to a local, loopback, or LAN private IP address.
@@ -140,8 +142,8 @@ export function getBaseRedirectUrl(envOverride) {
     return validated;
   }
 
-  // Development default: Cloudflare Worker dev server
-  return 'http://127.0.0.1:8787';
+  // Canonical TapMe public redirect base URL default
+  return CANONICAL_PUBLIC_REDIRECT_BASE_URL;
 }
 
 /**

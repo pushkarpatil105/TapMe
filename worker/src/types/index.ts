@@ -14,6 +14,12 @@ export type LinkPlatform =
   | "whatsapp"
   | "other";
 
+export type QrType =
+  | "google_review"
+  | "instagram"
+  | "whatsapp"
+  | "all_in_one";
+
 export interface CardLink {
   id: string;
   card_number: number;
@@ -32,6 +38,9 @@ export interface Card {
   business_name: string;
   location: string | null;
   status: "active" | "inactive" | "archived";
+  qr_type: QrType;
+  configured_at: string | null;
+  is_configured: boolean;
   created_at: string;
   updated_at: string;
   created_by: string;
@@ -51,6 +60,7 @@ export interface CreateLinkInput {
 export interface CreateCardInput {
   business_name: string;
   location?: string | null;
+  qr_type: QrType;
   links?: CreateLinkInput[];
 }
 

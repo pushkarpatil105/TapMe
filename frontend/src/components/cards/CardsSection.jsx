@@ -5,6 +5,7 @@ import { CreateCardModal } from './CreateCardModal'
 import { CardDetailsModal } from './CardDetailsModal'
 import { EditCardModal } from './EditCardModal'
 import { ConfirmationModal } from './ConfirmationModal'
+import { ScanCardModal } from './ScanCardModal'
 
 export function CardsSection() {
   const { user, logout } = useAuth()
@@ -24,6 +25,7 @@ export function CardsSection() {
 
   // Modal states
   const [isCreating, setIsCreating] = useState(false)
+  const [isScanning, setIsScanning] = useState(false)
   const [viewingCardId, setViewingCardId] = useState(null)
   const [editingCard, setEditingCard] = useState(null)
 
@@ -164,8 +166,6 @@ export function CardsSection() {
   }
 
   const handleOpenEdit = async (cardNumber) => {
-    if (!isMainAdmin) return
-
     try {
       const response = await fetch(`/api/cards/${cardNumber}`, {
         method: 'GET',
@@ -176,6 +176,10 @@ export function CardsSection() {
       if (response.ok && json?.success && json?.data) {
         if (json.data.status === 'archived') {
           alert('Archived cards cannot be edited. Please restore the card first.')
+          return
+        }
+        if (!isMainAdmin && json.data.is_configured) {
+          alert('Staff members are not permitted to edit already-configured cards.')
           return
         }
         setViewingCardId(null)
@@ -296,8 +300,25 @@ export function CardsSection() {
         onLifecycleAction={handleOpenLifecycle}
         onRefresh={handleRefresh}
         onCreateCard={() => setIsCreating(true)}
+        onScanCard={() => setIsScanning(true)}
         isMainAdmin={isMainAdmin}
       />
+
+      {/* QR Inventory Scanner Modal */}
+      {isScanning && (
+        <ScanCardModal
+          onClose={() => setIsScanning(false)}
+          onConfigureCard={(card) => {
+            setIsScanning(false)
+            setEditingCard(card)
+          }}
+          onEditCard={(card) => {
+            setIsScanning(false)
+            setEditingCard(card)
+          }}
+          isMainAdmin={isMainAdmin}
+        />
+      )}
 
       {/* Create Card Dialog */}
       {isCreating && (
@@ -321,8 +342,8 @@ export function CardsSection() {
         />
       )}
 
-      {/* Edit Card Dialog (Main Admin Only) */}
-      {editingCard !== null && isMainAdmin && (
+      {/* Edit / Configure Card Dialog */}
+      {editingCard !== null && (isMainAdmin || !editingCard.is_configured) && (
         <EditCardModal
           card={editingCard}
           onClose={() => setEditingCard(null)}

@@ -5,6 +5,7 @@ import type {
   CreateCardInput,
   CreateLinkInput,
   LinkPlatform,
+  QrType,
   UpdateCardInput,
 } from "../types";
 
@@ -13,6 +14,13 @@ export const ALLOWED_PLATFORMS = new Set<LinkPlatform>([
   "instagram",
   "whatsapp",
   "other",
+]);
+
+export const ALLOWED_QR_TYPES = new Set<QrType>([
+  "google_review",
+  "instagram",
+  "whatsapp",
+  "all_in_one",
 ]);
 
 export const DEFAULT_LABELS: Record<LinkPlatform, string> = {
@@ -45,6 +53,50 @@ export function isValidDestinationUrl(urlStr: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Strips URL query parameters and fragments that may contain access tokens,
+ * tracking identifiers, or other sensitive runtime values before writing to audit logs.
+ * Preserves the protocol, host, port, and path.
+ */
+export function sanitizeUrlForAudit(rawUrl: string): string {
+  if (typeof rawUrl !== "string" || !rawUrl.trim()) {
+    return "";
+  }
+
+  try {
+    const parsed = new URL(rawUrl.trim());
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return rawUrl.trim().split(/[?#]/)[0];
+  }
+}
+
+/**
+ * Sanitizes link metadata for safe storage in audit logs, preserving platform,
+ * label, display order, enabled status, and sanitizing the destination URL.
+ */
+export function sanitizeLinkForAudit<T extends {
+  platform: LinkPlatform;
+  label: string;
+  destination_url: string;
+  display_order: number;
+  is_enabled: boolean;
+}>(link: T): {
+  platform: LinkPlatform;
+  label: string;
+  destination_url: string;
+  display_order: number;
+  is_enabled: boolean;
+} {
+  return {
+    platform: link.platform,
+    label: link.label,
+    destination_url: sanitizeUrlForAudit(link.destination_url),
+    display_order: link.display_order,
+    is_enabled: Boolean(link.is_enabled),
+  };
 }
 
 interface ValidatedLink {
@@ -164,12 +216,73 @@ export function validateLinksInput(
   return { valid: true, links: validated };
 }
 
+export function validateLinksForQrType(
+  qrType: QrType,
+  validatedLinks: ValidatedLink[],
+): { valid: true } | { valid: false; error: string } {
+  if (validatedLinks.length === 0) {
+    return { valid: true };
+  }
+
+  if (qrType === "google_review") {
+    if (validatedLinks.length > 1) {
+      return {
+        valid: false,
+        error: "google_review cards allow at most 1 destination link.",
+      };
+    }
+    if (validatedLinks[0].platform !== "google_reviews") {
+      return {
+        valid: false,
+        error: `Link platform must be 'google_reviews' for google_review cards (received '${validatedLinks[0].platform}').`,
+      };
+    }
+  } else if (qrType === "instagram") {
+    if (validatedLinks.length > 1) {
+      return {
+        valid: false,
+        error: "instagram cards allow at most 1 destination link.",
+      };
+    }
+    if (validatedLinks[0].platform !== "instagram") {
+      return {
+        valid: false,
+        error: `Link platform must be 'instagram' for instagram cards (received '${validatedLinks[0].platform}').`,
+      };
+    }
+  } else if (qrType === "whatsapp") {
+    if (validatedLinks.length > 1) {
+      return {
+        valid: false,
+        error: "whatsapp cards allow at most 1 destination link.",
+      };
+    }
+    if (validatedLinks[0].platform !== "whatsapp") {
+      return {
+        valid: false,
+        error: `Link platform must be 'whatsapp' for whatsapp cards (received '${validatedLinks[0].platform}').`,
+      };
+    }
+  } else if (qrType === "all_in_one") {
+    if (validatedLinks.length > 20) {
+      return {
+        valid: false,
+        error: "A card cannot have more than 20 destination links.",
+      };
+    }
+  }
+
+  return { valid: true };
+}
+
 interface RawCardRow {
   card_number: number;
   public_token: string;
   business_name: string;
   location: string | null;
   status: "active" | "inactive" | "archived";
+  qr_type: QrType;
+  configured_at: string | null;
   created_at: string;
   updated_at: string;
   created_by: string;
@@ -196,6 +309,9 @@ function mapCardRow(row: RawCardRow): Card {
     business_name: row.business_name,
     location: row.location,
     status: row.status,
+    qr_type: row.qr_type,
+    configured_at: row.configured_at,
+    is_configured: row.configured_at !== null,
     created_at: row.created_at,
     updated_at: row.updated_at,
     created_by: row.created_by,
@@ -232,7 +348,13 @@ export async function createCard(
     };
   }
 
-  if ("status" in rawBody || "created_at" in rawBody || "updated_at" in rawBody) {
+  if (
+    "status" in rawBody ||
+    "created_at" in rawBody ||
+    "updated_at" in rawBody ||
+    "configured_at" in rawBody ||
+    "is_configured" in rawBody
+  ) {
     return {
       success: false,
       error: "status and timestamps cannot be set directly during card creation.",
@@ -240,7 +362,7 @@ export async function createCard(
     };
   }
 
-  const { business_name, location, links } = input;
+  const { business_name, location, qr_type, links } = input;
 
   if (
     typeof business_name !== "string" ||
@@ -250,6 +372,17 @@ export async function createCard(
     return {
       success: false,
       error: "business_name is required and must be between 1 and 200 characters.",
+      status: 400,
+    };
+  }
+
+  if (
+    typeof qr_type !== "string" ||
+    !ALLOWED_QR_TYPES.has(qr_type as QrType)
+  ) {
+    return {
+      success: false,
+      error: "qr_type is required. Allowed values: google_review, instagram, whatsapp, all_in_one.",
       status: 400,
     };
   }
@@ -275,15 +408,29 @@ export async function createCard(
     validatedLinks = linkValidation.links;
   }
 
+  // Validate platform constraints against qr_type
+  const qrValidation = validateLinksForQrType(qr_type as QrType, validatedLinks);
+  if (!qrValidation.valid) {
+    return { success: false, error: qrValidation.error, status: 400 };
+  }
+
   const publicToken = generatePublicToken();
   const batchStatements: D1PreparedStatement[] = [];
 
   // 1. Insert card
   batchStatements.push(
     env.DB.prepare(
-      `INSERT INTO cards (public_token, business_name, location, status, created_by, updated_by)
-       VALUES (?, ?, ?, 'active', ?, ?)`
-    ).bind(publicToken, business_name.trim(), cleanLocation, adminId, adminId)
+      `INSERT INTO cards (public_token, business_name, location, status, qr_type, configured_at, created_by, updated_by)
+       VALUES (?, ?, ?, 'active', ?, CASE WHEN ? > 0 THEN CURRENT_TIMESTAMP ELSE NULL END, ?, ?)`
+    ).bind(
+      publicToken,
+      business_name.trim(),
+      cleanLocation,
+      qr_type,
+      validatedLinks.length,
+      adminId,
+      adminId
+    )
   );
 
   // 2. Insert links referencing the card's generated card_number atomically via subquery
@@ -304,6 +451,31 @@ export async function createCard(
       )
     );
   }
+
+  // 3. Insert audit log atomically
+  const auditLogId = crypto.randomUUID();
+  const creationDetails = JSON.stringify({
+    business_name: business_name.trim(),
+    location: cleanLocation,
+    qr_type,
+    is_configured: validatedLinks.length > 0,
+    links_count: validatedLinks.length,
+    links: validatedLinks.map(sanitizeLinkForAudit),
+  });
+
+  batchStatements.push(
+    env.DB.prepare(
+      `INSERT INTO audit_logs (id, admin_id, action, entity_type, entity_id, details, created_at)
+       SELECT ?, ?, 'card.created', 'card', CAST(card_number AS TEXT), json_set(?, '$.card_number', card_number), CURRENT_TIMESTAMP
+       FROM cards
+       WHERE public_token = ?`
+    ).bind(
+      auditLogId,
+      adminId,
+      creationDetails,
+      publicToken
+    )
+  );
 
   try {
     await env.DB.batch(batchStatements);
@@ -361,6 +533,8 @@ export async function listCards(
        cards.business_name,
        cards.location,
        cards.status,
+       cards.qr_type,
+       cards.configured_at,
        cards.created_at,
        cards.updated_at,
        cards.created_by,
@@ -383,6 +557,8 @@ export async function listCards(
        cards.business_name,
        cards.location,
        cards.status,
+       cards.qr_type,
+       cards.configured_at,
        cards.created_at,
        cards.updated_at,
        cards.created_by,
@@ -442,6 +618,8 @@ export async function getCardByIdOrToken(
          cards.business_name,
          cards.location,
          cards.status,
+         cards.qr_type,
+         cards.configured_at,
          cards.created_at,
          cards.updated_at,
          cards.created_by,
@@ -464,6 +642,8 @@ export async function getCardByIdOrToken(
          cards.business_name,
          cards.location,
          cards.status,
+         cards.qr_type,
+         cards.configured_at,
          cards.created_at,
          cards.updated_at,
          cards.created_by,
@@ -505,12 +685,13 @@ export async function updateCard(
   adminId: string,
   input: UpdateCardInput,
   rawBody: Record<string, unknown>,
+  userRole?: "main_admin" | "staff",
 ): Promise<{ success: true; card: Card } | { success: false; error: string; status: number }> {
-  // Reject attempt to modify permanent card_number or public_token
-  if ("card_number" in rawBody || "public_token" in rawBody) {
+  // Reject attempt to modify permanent card_number, public_token, or qr_type
+  if ("card_number" in rawBody || "public_token" in rawBody || "qr_type" in rawBody) {
     return {
       success: false,
-      error: "card_number and public_token are permanent and cannot be modified.",
+      error: "card_number, public_token, and qr_type are permanent and cannot be modified.",
       status: 400,
     };
   }
@@ -519,13 +700,24 @@ export async function updateCard(
     "id" in rawBody ||
     "created_at" in rawBody ||
     "created_by" in rawBody ||
-    "status" in rawBody
+    "status" in rawBody ||
+    "configured_at" in rawBody ||
+    "is_configured" in rawBody
   ) {
     return {
       success: false,
       error: "System identifiers and status cannot be modified via this endpoint.",
       status: 400,
     };
+  }
+
+  // Determine effective user role
+  let effectiveRole = userRole;
+  if (!effectiveRole) {
+    const adminRow = await env.DB.prepare("SELECT role FROM admins WHERE id = ?")
+      .bind(adminId)
+      .first<{ role: "main_admin" | "staff" }>();
+    effectiveRole = adminRow?.role || "main_admin";
   }
 
   // Retrieve current card
@@ -543,6 +735,15 @@ export async function updateCard(
       success: false,
       error: "Archived cards cannot be edited. Please restore the card first.",
       status: 400,
+    };
+  }
+
+  // Staff permission rule: Staff cannot edit cards once configured_at is non-null
+  if (effectiveRole === "staff" && existingCard.configured_at !== null) {
+    return {
+      success: false,
+      error: "Staff members are not permitted to edit already-configured cards.",
+      status: 403,
     };
   }
 
@@ -598,27 +799,131 @@ export async function updateCard(
     if (!linkValidation.valid) {
       return { success: false, error: linkValidation.error, status: 400 };
     }
+    const qrValidation = validateLinksForQrType(existingCard.qr_type, linkValidation.links);
+    if (!qrValidation.valid) {
+      return { success: false, error: qrValidation.error, status: 400 };
+    }
     validatedLinks = linkValidation.links;
   }
 
+  // Staff configuration rule: Staff configuring an unconfigured card must provide destination links
+  if (effectiveRole === "staff" && (!validatedLinks || validatedLinks.length === 0)) {
+    return {
+      success: false,
+      error: "At least one destination link is required to configure a card.",
+      status: 400,
+    };
+  }
+
+  // Determine what actually changed
+  const changes: Record<string, { before: unknown; after: unknown }> = {};
+
+  if (business_name !== undefined && finalBusinessName !== existingCard.business_name) {
+    changes.business_name = {
+      before: existingCard.business_name,
+      after: finalBusinessName,
+    };
+  }
+
+  const existingNormalizedLocation = existingCard.location || null;
+  const newNormalizedLocation = finalLocation || null;
+  if (location !== undefined && existingNormalizedLocation !== newNormalizedLocation) {
+    changes.location = {
+      before: existingCard.location,
+      after: finalLocation,
+    };
+  }
+
+  if (validatedLinks !== null) {
+    const currentLinks = (existingCard.links || []).map((l) => ({
+      platform: l.platform,
+      label: l.label,
+      destination_url: l.destination_url,
+      display_order: l.display_order,
+      is_enabled: Boolean(l.is_enabled),
+    }));
+    const newLinks = validatedLinks.map((l) => ({
+      platform: l.platform,
+      label: l.label,
+      destination_url: l.destination_url,
+      display_order: l.display_order,
+      is_enabled: Boolean(l.is_enabled),
+    }));
+
+    const linksChanged =
+      currentLinks.length !== newLinks.length ||
+      currentLinks.some(
+        (curr, idx) =>
+          curr.platform !== newLinks[idx].platform ||
+          curr.label !== newLinks[idx].label ||
+          curr.destination_url !== newLinks[idx].destination_url ||
+          curr.display_order !== newLinks[idx].display_order ||
+          curr.is_enabled !== newLinks[idx].is_enabled
+      );
+
+    if (linksChanged) {
+      changes.links = {
+        before: currentLinks.map(sanitizeLinkForAudit),
+        after: newLinks.map(sanitizeLinkForAudit),
+      };
+    }
+  }
+
+  // If no fields changed, this is a no-op update: do not write an audit event or touch DB
+  if (Object.keys(changes).length === 0) {
+    return { success: true, card: existingCard };
+  }
+
   const batchStatements: D1PreparedStatement[] = [];
+  const isInitialConfiguration =
+    existingCard.configured_at === null &&
+    (validatedLinks !== null && validatedLinks.length > 0);
 
   // Update card fields
-  batchStatements.push(
-    env.DB.prepare(
-      `UPDATE cards
-       SET business_name = ?, location = ?, updated_at = CURRENT_TIMESTAMP, updated_by = ?
-       WHERE card_number = ?`
-    ).bind(
-      finalBusinessName,
-      finalLocation,
-      adminId,
-      existingCard.card_number
-    )
-  );
+  if (effectiveRole === "staff") {
+    // Concurrency-safe atomic conditional update for staff:
+    // If another concurrent request has already stamped configured_at, the CASE statement
+    // sets status to '__ALREADY_CONFIGURED_ABORT__', which violates the CHECK constraint
+    // (CHECK (status IN ('active', 'inactive', 'archived'))) and aborts the entire transaction.
+    batchStatements.push(
+      env.DB.prepare(
+        `UPDATE cards
+         SET business_name = ?,
+             location = ?,
+             configured_at = CURRENT_TIMESTAMP,
+             updated_at = CURRENT_TIMESTAMP,
+             updated_by = ?,
+             status = CASE
+               WHEN configured_at IS NOT NULL THEN '__ALREADY_CONFIGURED_ABORT__'
+               ELSE status
+             END
+         WHERE card_number = ?`
+      ).bind(
+        finalBusinessName,
+        finalLocation,
+        adminId,
+        existingCard.card_number
+      )
+    );
+  } else {
+    // Main Admin update: can update configured or unconfigured cards; stamps configured_at when unconfigured card gets links
+    batchStatements.push(
+      env.DB.prepare(
+        `UPDATE cards
+         SET business_name = ?, location = ?, configured_at = CASE WHEN configured_at IS NULL AND ? > 0 THEN CURRENT_TIMESTAMP ELSE configured_at END, updated_at = CURRENT_TIMESTAMP, updated_by = ?
+         WHERE card_number = ?`
+      ).bind(
+        finalBusinessName,
+        finalLocation,
+        validatedLinks ? validatedLinks.length : 0,
+        adminId,
+        existingCard.card_number
+      )
+    );
+  }
 
-  // If links array was provided, atomically replace links
-  if (validatedLinks !== null) {
+  // If links array was provided and changed, atomically replace links
+  if (validatedLinks !== null && changes.links) {
     batchStatements.push(
       env.DB.prepare("DELETE FROM card_links WHERE card_number = ?").bind(
         existingCard.card_number
@@ -644,9 +949,52 @@ export async function updateCard(
     }
   }
 
+  // Atomically write audit event for card update or initial configuration
+  const auditLogId = crypto.randomUUID();
+  const auditAction = isInitialConfiguration ? "card.configured" : "card.updated";
+  const auditDetails = JSON.stringify({
+    card_number: existingCard.card_number,
+    qr_type: existingCard.qr_type,
+    ...(isInitialConfiguration ? { is_configured: true } : {}),
+    changed_fields: Object.keys(changes),
+    changes,
+  });
+
+  batchStatements.push(
+    env.DB.prepare(
+      `INSERT INTO audit_logs (id, admin_id, action, entity_type, entity_id, details, created_at)
+       VALUES (?, ?, ?, 'card', ?, ?, CURRENT_TIMESTAMP)`
+    ).bind(
+      auditLogId,
+      adminId,
+      auditAction,
+      String(existingCard.card_number),
+      auditDetails
+    )
+  );
+
   try {
     await env.DB.batch(batchStatements);
   } catch (err: unknown) {
+    const errMsg = String(err);
+    // Only attribute to staff concurrency abort if this is a staff update AND
+    // the check constraint failure specifically targeted the intentional cards.status check
+    const isStaffConcurrencyAbort =
+      effectiveRole === "staff" &&
+      (errMsg.includes("__ALREADY_CONFIGURED_ABORT__") ||
+        (errMsg.includes("CHECK constraint failed") &&
+          (errMsg.includes("status IN") || errMsg.includes("cards.status") || errMsg.includes("status")) &&
+          !errMsg.includes("platform") &&
+          !errMsg.includes("qr_type") &&
+          !errMsg.includes("is_enabled")));
+
+    if (isStaffConcurrencyAbort) {
+      return {
+        success: false,
+        error: "Staff members are not permitted to edit already-configured cards.",
+        status: 403,
+      };
+    }
     console.error("Failed to update card atomically:", err);
     return {
       success: false,

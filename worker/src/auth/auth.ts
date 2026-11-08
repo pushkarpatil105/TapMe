@@ -9,6 +9,7 @@ export interface AdminAccount {
   password_hash: string;
   role: "main_admin" | "staff";
   status: "active" | "disabled";
+  deleted_at?: string | null;
 }
 
 export type LoginResult =
@@ -47,7 +48,7 @@ export async function loginAdmin(
   }
 
   const admin = await env.DB.prepare(
-    `SELECT id, username, password_hash, role, status
+    `SELECT id, username, password_hash, role, status, deleted_at
      FROM admins
      WHERE username = ? COLLATE NOCASE
      LIMIT 1`,
@@ -55,7 +56,7 @@ export async function loginAdmin(
     .bind(username.trim())
     .first<AdminAccount>();
 
-  if (!admin || admin.status !== "active") {
+  if (!admin || admin.status !== "active" || admin.deleted_at !== null) {
     return {
       success: false,
       message: "Invalid username or password.",

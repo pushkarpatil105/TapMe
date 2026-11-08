@@ -108,25 +108,31 @@ export function getQRLogoByPlatform(platform) {
 }
 
 /**
- * Resolves the QR centre logo according to card destination rules:
- * - Exactly 1 enabled destination link: Use that platform's logo (Google, Instagram, WhatsApp, Other).
- * - Multiple enabled destination links (or 0): Use TapMe branding logo.
+ * Resolves the QR centre logo exclusively according to the card's immutable qr_type:
+ * - 'google_review' -> Google Reviews logo
+ * - 'instagram'     -> Instagram logo
+ * - 'whatsapp'      -> WhatsApp logo
+ * - 'all_in_one'    -> null (no logo, no center patch)
  *
- * @param {Array<Object>|{ links?: Array<Object> }} cardOrLinks - Either an array of links or a card object containing .links
- * @returns {typeof QR_LOGOS[keyof typeof QR_LOGOS]}
+ * Destination links must NEVER influence the physical QR design.
+ *
+ * @param {string|{ qr_type?: string }} cardOrType - Card object or qr_type string
+ * @returns {typeof QR_LOGOS[keyof typeof QR_LOGOS] | null}
  */
-export function getQRLogoForCard(cardOrLinks) {
-  const rawLinks = Array.isArray(cardOrLinks)
-    ? cardOrLinks
-    : cardOrLinks?.links || []
+export function getQRLogoForCard(cardOrType) {
+  const qrType = typeof cardOrType === 'string'
+    ? cardOrType
+    : cardOrType?.qr_type
 
-  const enabledLinks = rawLinks.filter((l) => l && l.is_enabled !== false)
-
-  if (enabledLinks.length === 1) {
-    const platform = enabledLinks[0].platform
-    return getQRLogoByPlatform(platform)
+  switch (qrType) {
+    case 'google_review':
+      return QR_LOGOS.google_reviews
+    case 'instagram':
+      return QR_LOGOS.instagram
+    case 'whatsapp':
+      return QR_LOGOS.whatsapp
+    case 'all_in_one':
+    default:
+      return null
   }
-
-  // 0 or 2+ enabled links -> TapMe branding
-  return QR_LOGOS.tapme
 }

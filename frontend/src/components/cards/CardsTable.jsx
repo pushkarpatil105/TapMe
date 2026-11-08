@@ -11,6 +11,7 @@ export function CardsTable({
   onLifecycleAction,
   onRefresh,
   onCreateCard,
+  onScanCard,
   isMainAdmin,
 }) {
   const formatDate = (dateStr) => {
@@ -65,6 +66,28 @@ export function CardsTable({
               />
             </svg>
             <span>Refresh</span>
+          </button>
+          <button
+            type="button"
+            className="action-btn action-btn-secondary"
+            onClick={onScanCard}
+            title="Scan QR card from camera, image, or manual entry"
+          >
+            <svg
+              className="btn-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="3" y="3" width="7" height="7" />
+              <rect x="14" y="3" width="7" height="7" />
+              <rect x="14" y="14" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" />
+            </svg>
+            <span>Scan Card</span>
           </button>
           <button
             type="button"
@@ -199,15 +222,15 @@ export function CardsTable({
                           View
                         </button>
 
-                        {/* Edit is allowed for Main Admin only on non-archived cards */}
-                        {isMainAdmin && !isArchived && (
+                        {/* Edit for Main Admin on non-archived cards; Configure for Staff on unconfigured cards */}
+                        {!isArchived && (isMainAdmin || !card.is_configured) && (
                           <button
                             type="button"
-                            className="btn-row btn-row-edit"
+                            className={`btn-row ${isMainAdmin ? 'btn-row-edit' : 'btn-row-configure'}`}
                             onClick={() => onEditCard(card.card_number)}
-                            title="Edit card"
+                            title={isMainAdmin ? 'Edit card' : 'Configure card'}
                           >
-                            Edit
+                            {isMainAdmin ? 'Edit' : 'Configure'}
                           </button>
                         )}
 

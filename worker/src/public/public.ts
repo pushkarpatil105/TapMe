@@ -1,5 +1,6 @@
-import type { AppEnv } from "../types";
+import type { AppEnv, QrType } from "../types";
 import { successResponse, errorResponse } from "../utils/responses";
+import { telemetry } from "../diagnostics/telemetry";
 
 export interface PublicLink {
   id: string;
@@ -13,6 +14,8 @@ export interface PublicCardResult {
   cardNumber: number;
   businessName: string;
   status: "active" | "inactive" | "archived";
+  qrType: QrType;
+  configuredAt: string | null;
   enabledLinks: PublicLink[];
 }
 
@@ -105,7 +108,7 @@ export async function getPublicCardByToken(
   }
 
   const cardRow = await env.DB.prepare(
-    `SELECT card_number, business_name, status
+    `SELECT card_number, business_name, status, qr_type, configured_at
      FROM cards
      WHERE public_token = ?
      LIMIT 1`
@@ -115,6 +118,8 @@ export async function getPublicCardByToken(
       card_number: number;
       business_name: string;
       status: "active" | "inactive" | "archived";
+      qr_type: QrType;
+      configured_at: string | null;
     }>();
 
   if (!cardRow) {
@@ -129,6 +134,8 @@ export async function getPublicCardByToken(
         cardNumber: cardRow.card_number,
         businessName: cardRow.business_name,
         status: cardRow.status,
+        qrType: cardRow.qr_type,
+        configuredAt: cardRow.configured_at,
         enabledLinks: [],
       },
     };
@@ -165,6 +172,8 @@ export async function getPublicCardByToken(
       cardNumber: cardRow.card_number,
       businessName: cardRow.business_name,
       status: "active",
+      qrType: cardRow.qr_type,
+      configuredAt: cardRow.configured_at,
       enabledLinks,
     },
   };
@@ -429,6 +438,7 @@ export async function handlePublicRedirect(
 
   // Check for malformed path such as trailing slashes or nested paths
   if (!token || token.includes("/")) {
+    telemetry.recordRedirectMetric("invalid_token", { path: url.pathname });
     return createUnavailableResponse(
       request,
       url,
@@ -437,8 +447,10 @@ export async function handlePublicRedirect(
     );
   }
 
+  const rawTokenStr = String(token);
   // 1. Validate public token format before querying D1
   if (!isValidPublicToken(token)) {
+    telemetry.recordRedirectMetric("invalid_token", { tokenPrefix: rawTokenStr.slice(0, 8) });
     return createUnavailableResponse(
       request,
       url,
@@ -451,10 +463,12 @@ export async function handlePublicRedirect(
   const result = await getPublicCardByToken(env, token);
 
   if (!result.valid) {
+    telemetry.recordRedirectMetric("invalid_token", { error: result.error });
     return createUnavailableResponse(request, url, result.error, 400);
   }
 
   if (!result.found) {
+    telemetry.recordRedirectMetric("card_not_found", { tokenPrefix: token.slice(0, 8) });
     return createUnavailableResponse(
       request,
       url,
@@ -467,6 +481,7 @@ export async function handlePublicRedirect(
 
   // 3. Inactive or archived cards
   if (card.status !== "active") {
+    telemetry.recordRedirectMetric("inactive", { cardNumber: card.cardNumber, status: card.status });
     return createUnavailableResponse(
       request,
       url,
@@ -475,8 +490,9 @@ export async function handlePublicRedirect(
     );
   }
 
-  // 4. Zero enabled links
-  if (card.enabledLinks.length === 0) {
+  // 4. Unconfigured cards
+  if (card.configuredAt === null) {
+    telemetry.recordRedirectMetric("unconfigured", { cardNumber: card.cardNumber });
     return createUnavailableResponse(
       request,
       url,
@@ -485,14 +501,47 @@ export async function handlePublicRedirect(
     );
   }
 
-  // 5. Exactly ONE enabled link: redirect directly
-  if (card.enabledLinks.length === 1) {
+  // 5. Zero enabled links
+  if (card.enabledLinks.length === 0) {
+    telemetry.recordRedirectMetric("unconfigured", { cardNumber: card.cardNumber });
+    return createUnavailableResponse(
+      request,
+      url,
+      "Destinations are not currently available for this card.",
+      404
+    );
+  }
+
+  // 6. Single-purpose types: Google Review, Instagram, WhatsApp
+  if (card.qrType !== "all_in_one") {
+    const expectedPlatformMap: Record<string, string> = {
+      google_review: "google_reviews",
+      instagram: "instagram",
+      whatsapp: "whatsapp",
+    };
+    const expectedPlatform = expectedPlatformMap[card.qrType];
+
+    // Must have exactly one matching configured destination
+    if (
+      card.enabledLinks.length !== 1 ||
+      card.enabledLinks[0].platform !== expectedPlatform
+    ) {
+      telemetry.recordRedirectMetric("unconfigured", { cardNumber: card.cardNumber, qrType: card.qrType });
+      return createUnavailableResponse(
+        request,
+        url,
+        "Destinations are not currently available for this card.",
+        404
+      );
+    }
+
     const destination = card.enabledLinks[0].destination_url;
 
     // Record scan event; scan failure does NOT block redirect
     await recordScanEvent(env, card.cardNumber, request);
+    telemetry.recordRedirectMetric("success");
 
-    // Direct HTTP 302 redirect to the D1-stored URL only
+    // Direct HTTP 302 redirect to the destination only (no selection page)
     return new Response(null, {
       status: 302,
       headers: {
@@ -502,8 +551,10 @@ export async function handlePublicRedirect(
     });
   }
 
-  // 6. MULTIPLE enabled links: render customer selection interface
+  // 7. All-In-One: ALWAYS render the destination selection page
+  // (Applies even when exactly one destination is enabled; never automatically 302 redirects)
   await recordScanEvent(env, card.cardNumber, request);
+  telemetry.recordRedirectMetric("success");
 
   if (shouldReturnJson(request, url)) {
     return Response.json(
@@ -573,7 +624,7 @@ export async function handlePublicCardApi(
 
   const { card } = result;
 
-  if (card.status !== "active") {
+  if (card.status !== "active" || card.configuredAt === null) {
     return Response.json(
       {
         success: false,
@@ -593,6 +644,7 @@ export async function handlePublicCardApi(
   return successResponse({
     business_name: card.businessName,
     status: "active",
+    qr_type: card.qrType,
     links: card.enabledLinks,
   });
 }

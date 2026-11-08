@@ -1,11 +1,10 @@
 import { useState } from 'react'
-
-const PLATFORM_OPTIONS = [
-  { value: 'google_reviews', label: 'Google Reviews', defaultLabel: 'Review Us on Google', placeholder: 'https://g.page/r/...' },
-  { value: 'instagram', label: 'Instagram', defaultLabel: 'Follow Us on Instagram', placeholder: 'https://instagram.com/username' },
-  { value: 'whatsapp', label: 'WhatsApp', defaultLabel: 'Message on WhatsApp', placeholder: 'https://wa.me/1234567890' },
-  { value: 'other', label: 'Other / Website', defaultLabel: 'Visit Our Website', placeholder: 'https://example.com' },
-]
+import {
+  QR_TYPE_CONFIG,
+  PLATFORM_OPTIONS,
+  validateEditCardForm,
+  formatEditCardPayload,
+} from '../../utils/card-workflow'
 
 export function EditCardModal({ card, onClose, onCardUpdated, isMainAdmin }) {
   const [businessName, setBusinessName] = useState(card?.business_name || '')
@@ -21,15 +20,25 @@ export function EditCardModal({ card, onClose, onCardUpdated, isMainAdmin }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
-  if (!isMainAdmin) {
+  if (!isMainAdmin && card?.is_configured) {
     return null
   }
 
+  const cardQrType = card?.qr_type || 'all_in_one'
+  const activeQrConfig = QR_TYPE_CONFIG[cardQrType] || QR_TYPE_CONFIG.all_in_one
+  const availablePlatforms = PLATFORM_OPTIONS.filter((p) =>
+    activeQrConfig.allowedPlatforms.includes(p.value)
+  )
+
   const handleAddLink = () => {
+    if (links.length >= activeQrConfig.maxLinks) {
+      return
+    }
+
     const usedPlatforms = new Set(links.map((l) => l.platform))
-    const nextAvailable = PLATFORM_OPTIONS.find(
-      (p) => p.value !== 'other' && !usedPlatforms.has(p.value)
-    ) || PLATFORM_OPTIONS[3]
+    const nextAvailable =
+      availablePlatforms.find((p) => p.value !== 'other' && !usedPlatforms.has(p.value)) ||
+      availablePlatforms[0]
 
     setLinks([
       ...links,
@@ -60,60 +69,20 @@ export function EditCardModal({ card, onClose, onCardUpdated, isMainAdmin }) {
     setLinks(updated)
   }
 
-  const validateForm = () => {
-    if (!businessName.trim()) {
-      return 'Business name is required.'
-    }
-    if (businessName.trim().length > 200) {
-      return 'Business name cannot exceed 200 characters.'
-    }
-    if (location.trim().length > 200) {
-      return 'Location cannot exceed 200 characters.'
-    }
-
-    const seenUrls = new Set()
-    const seenPlatforms = new Set()
-
-    for (let i = 0; i < links.length; i++) {
-      const l = links[i]
-      const url = l.destination_url.trim()
-
-      if (!url) {
-        return `Link #${i + 1} (${l.platform}) requires a destination URL.`
-      }
-
-      try {
-        const parsed = new URL(url)
-        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-          return `Link #${i + 1} URL must start with http:// or https://.`
-        }
-      } catch {
-        return `Link #${i + 1} has an invalid URL format.`
-      }
-
-      const lowerUrl = url.toLowerCase()
-      if (seenUrls.has(lowerUrl)) {
-        return `Duplicate destination URL found: "${url}". Each link must have a unique URL.`
-      }
-      seenUrls.add(lowerUrl)
-
-      if (l.platform !== 'other') {
-        if (seenPlatforms.has(l.platform)) {
-          return `Only one "${l.platform.replace('_', ' ')}" link is permitted per card.`
-        }
-        seenPlatforms.add(l.platform)
-      }
-    }
-
-    return null
-  }
-
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (isSubmitting) return
 
     setErrorMessage('')
-    const validationError = validateForm()
+    const validationError = validateEditCardForm({
+      businessName,
+      location,
+      qrType: cardQrType,
+      links,
+      isMainAdmin,
+      isConfigured: Boolean(card?.is_configured),
+    })
+
     if (validationError) {
       setErrorMessage(validationError)
       return
@@ -122,17 +91,11 @@ export function EditCardModal({ card, onClose, onCardUpdated, isMainAdmin }) {
     setIsSubmitting(true)
 
     try {
-      const payload = {
-        business_name: businessName.trim(),
-        location: location.trim() || null,
-        links: links.map((l, idx) => ({
-          platform: l.platform,
-          destination_url: l.destination_url.trim(),
-          label: l.label?.trim() || undefined,
-          is_enabled: Boolean(l.is_enabled),
-          display_order: idx,
-        })),
-      }
+      const payload = formatEditCardPayload({
+        businessName,
+        location,
+        links,
+      })
 
       const response = await fetch(`/api/cards/${card.card_number}`, {
         method: 'PATCH',
@@ -165,7 +128,7 @@ export function EditCardModal({ card, onClose, onCardUpdated, isMainAdmin }) {
         <div className="modal-header">
           <div className="modal-header-info">
             <h2 id="edit-modal-title" className="modal-title">
-              Edit Card
+              {isMainAdmin ? 'Edit Card' : 'Configure Card'}
             </h2>
             <span className="card-number-tag font-bold">
               {card.formatted_card_number || String(card.card_number).padStart(3, '0')}
@@ -208,10 +171,31 @@ export function EditCardModal({ card, onClose, onCardUpdated, isMainAdmin }) {
                 <span className="details-label">Permanent Public Token</span>
                 <code className="public-token-code">{card.public_token}</code>
               </div>
+              <div className="readonly-meta-item">
+                <span className="details-label">Permanent QR Type</span>
+                <span className="font-bold text-main">
+                  {activeQrConfig.label}
+                </span>
+              </div>
               <span className="text-dim text-xs block mt-1">
-                🔒 Identifiers are permanent and cannot be modified.
+                🔒 Permanent identifiers and QR Type cannot be modified.
               </span>
             </div>
+
+            {!isMainAdmin && (
+              <div className="info-banner mb-4">
+                <svg className="alert-icon text-muted" viewBox="0 0 20 20" fill="currentColor">
+                  <path
+                    fillRule="evenodd"
+                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                <span>
+                  Staff configuration is permanent. Once saved, future changes to this card will require a Main Admin.
+                </span>
+              </div>
+            )}
 
             {/* Business Name */}
             <div className="form-group">
@@ -249,25 +233,34 @@ export function EditCardModal({ card, onClose, onCardUpdated, isMainAdmin }) {
 
             {/* Destination Links Section */}
             <div className="form-section-header">
-              <label className="form-label">Destination Links</label>
-              <button
-                type="button"
-                className="action-btn action-btn-secondary btn-sm"
-                onClick={handleAddLink}
-                disabled={isSubmitting || links.length >= 20}
-              >
-                + Add Link
-              </button>
+              <div>
+                <label className="form-label mb-0">Destination Links</label>
+                <span className="text-dim text-xs block">
+                  {links.length}/{activeQrConfig.maxLinks} maximum for {activeQrConfig.label}
+                </span>
+              </div>
+              {links.length < activeQrConfig.maxLinks && (
+                <button
+                  type="button"
+                  className="action-btn action-btn-secondary btn-sm"
+                  onClick={handleAddLink}
+                  disabled={isSubmitting}
+                >
+                  + Add Link
+                </button>
+              )}
             </div>
 
             {links.length === 0 ? (
               <p className="text-muted text-sm italic">
-                No links added. Click &quot;+ Add Link&quot; above to configure destinations.
+                {isMainAdmin
+                  ? 'No destination links configured. (Main Admins may save cards without links).'
+                  : 'At least one destination link is required to complete staff configuration.'}
               </p>
             ) : (
               <div className="links-editor-list">
                 {links.map((link, idx) => {
-                  const currentPlatform = PLATFORM_OPTIONS.find((p) => p.value === link.platform)
+                  const currentPlatform = availablePlatforms.find((p) => p.value === link.platform)
                   return (
                     <div key={idx} className="link-editor-card">
                       <div className="link-editor-top">
@@ -276,9 +269,9 @@ export function EditCardModal({ card, onClose, onCardUpdated, isMainAdmin }) {
                           className="form-select"
                           value={link.platform}
                           onChange={(e) => handleLinkChange(idx, 'platform', e.target.value)}
-                          disabled={isSubmitting}
+                          disabled={isSubmitting || availablePlatforms.length <= 1}
                         >
-                          {PLATFORM_OPTIONS.map((opt) => (
+                          {availablePlatforms.map((opt) => (
                             <option key={opt.value} value={opt.value}>
                               {opt.label}
                             </option>
@@ -345,7 +338,9 @@ export function EditCardModal({ card, onClose, onCardUpdated, isMainAdmin }) {
               className="action-btn action-btn-primary"
               disabled={isSubmitting}
             >
-              {isSubmitting ? 'Saving Changes...' : 'Save Changes'}
+              {isSubmitting
+                ? (isMainAdmin ? 'Saving Changes...' : 'Saving Configuration...')
+                : (isMainAdmin ? 'Save Changes' : 'Save Configuration')}
             </button>
           </div>
         </form>

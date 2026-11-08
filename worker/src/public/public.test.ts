@@ -147,9 +147,10 @@ describe("Public Redirect System — Endpoints & Integration", () => {
       mainAdminId,
       {
         business_name: "No Links Cafe",
+        qr_type: "all_in_one",
         links: [],
       },
-      { business_name: "No Links Cafe" }
+      { business_name: "No Links Cafe", qr_type: "all_in_one" }
     );
     expect(created.success).toBe(true);
     if (!created.success) return;
@@ -187,6 +188,7 @@ describe("Public Redirect System — Endpoints & Integration", () => {
       mainAdminId,
       {
         business_name: "Single Link Pizza",
+        qr_type: "google_review",
         links: [
           {
             platform: "google_reviews",
@@ -195,7 +197,7 @@ describe("Public Redirect System — Endpoints & Integration", () => {
           },
         ],
       },
-      { business_name: "Single Link Pizza" }
+      { business_name: "Single Link Pizza", qr_type: "google_review" }
     );
     expect(created.success).toBe(true);
     if (!created.success) return;
@@ -222,6 +224,7 @@ describe("Public Redirect System — Endpoints & Integration", () => {
       mainAdminId,
       {
         business_name: "Multi Link Bistro",
+        qr_type: "all_in_one",
         links: [
           {
             platform: "google_reviews",
@@ -239,7 +242,7 @@ describe("Public Redirect System — Endpoints & Integration", () => {
           },
         ],
       },
-      { business_name: "Multi Link Bistro" }
+      { business_name: "Multi Link Bistro", qr_type: "all_in_one" }
     );
     expect(created.success).toBe(true);
     if (!created.success) return;
@@ -348,9 +351,10 @@ describe("Public Redirect System — Endpoints & Integration", () => {
       mainAdminId,
       {
         business_name: "Inactive Coffee",
+        qr_type: "whatsapp",
         links: [{ platform: "whatsapp", destination_url: "https://wa.me/12345", is_enabled: true }],
       },
-      { business_name: "Inactive Coffee" }
+      { business_name: "Inactive Coffee", qr_type: "whatsapp" }
     );
     expect(created.success).toBe(true);
     if (!created.success) return;
@@ -392,9 +396,10 @@ describe("Public Redirect System — Endpoints & Integration", () => {
       mainAdminId,
       {
         business_name: "Archived Bakery",
+        qr_type: "google_review",
         links: [{ platform: "google_reviews", destination_url: "https://g.page/bakery", is_enabled: true }],
       },
-      { business_name: "Archived Bakery" }
+      { business_name: "Archived Bakery", qr_type: "google_review" }
     );
     expect(created.success).toBe(true);
     if (!created.success) return;
@@ -436,6 +441,7 @@ describe("Public Redirect System — Endpoints & Integration", () => {
       mainAdminId,
       {
         business_name: "Mixed Links Store",
+        qr_type: "all_in_one",
         links: [
           {
             platform: "google_reviews",
@@ -449,21 +455,23 @@ describe("Public Redirect System — Endpoints & Integration", () => {
           },
         ],
       },
-      { business_name: "Mixed Links Store" }
+      { business_name: "Mixed Links Store", qr_type: "all_in_one" }
     );
     expect(created.success).toBe(true);
     if (!created.success) return;
 
     const token = created.card.public_token;
 
-    // Since only 1 link is enabled, /r/:token must directly redirect to the enabled link!
+    // For all_in_one, /r/:token always renders the selection page (HTTP 200) with only enabled links
     const res = await worker.fetch(new Request(`http://localhost:8787/r/${token}`, { redirect: "manual" }), testEnv, {
       waitUntil: () => {},
       passThroughOnException: () => {},
     } as any);
 
-    expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toBe("https://g.page/mixed-enabled");
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("https://g.page/mixed-enabled");
+    expect(html).not.toContain("https://instagram.com/mixed-disabled");
 
     // Customer API excludes disabled links
     const resApi = await worker.fetch(new Request(`http://localhost:8787/api/public/cards/${token}`), testEnv, {
@@ -483,9 +491,10 @@ describe("Public Redirect System — Endpoints & Integration", () => {
       mainAdminId,
       {
         business_name: "No Cookie Shop",
-        links: [{ platform: "other", destination_url: "https://example.com/nocookie", is_enabled: true }],
+        qr_type: "google_review",
+        links: [{ platform: "google_reviews", destination_url: "https://example.com/nocookie", is_enabled: true }],
       },
-      { business_name: "No Cookie Shop" }
+      { business_name: "No Cookie Shop", qr_type: "google_review" }
     );
     expect(created.success).toBe(true);
     if (!created.success) return;
@@ -507,9 +516,10 @@ describe("Public Redirect System — Endpoints & Integration", () => {
       mainAdminId,
       {
         business_name: "No Origin Shop",
-        links: [{ platform: "other", destination_url: "https://example.com/noorigin", is_enabled: true }],
+        qr_type: "google_review",
+        links: [{ platform: "google_reviews", destination_url: "https://example.com/noorigin", is_enabled: true }],
       },
-      { business_name: "No Origin Shop" }
+      { business_name: "No Origin Shop", qr_type: "google_review" }
     );
     expect(created.success).toBe(true);
     if (!created.success) return;
@@ -552,9 +562,10 @@ describe("Public Redirect System — Endpoints & Integration", () => {
       mainAdminId,
       {
         business_name: "Tracked Single",
+        qr_type: "whatsapp",
         links: [{ platform: "whatsapp", destination_url: "https://wa.me/111", is_enabled: true }],
       },
-      { business_name: "Tracked Single" }
+      { business_name: "Tracked Single", qr_type: "whatsapp" }
     );
     // 2. Multi-link card
     const card2 = await createCard(
@@ -562,12 +573,13 @@ describe("Public Redirect System — Endpoints & Integration", () => {
       mainAdminId,
       {
         business_name: "Tracked Multi",
+        qr_type: "all_in_one",
         links: [
           { platform: "google_reviews", destination_url: "https://g.page/222", is_enabled: true },
           { platform: "instagram", destination_url: "https://instagram.com/222", is_enabled: true },
         ],
       },
-      { business_name: "Tracked Multi" }
+      { business_name: "Tracked Multi", qr_type: "all_in_one" }
     );
 
     if (!card1.success || !card2.success) return;
@@ -604,9 +616,10 @@ describe("Public Redirect System — Endpoints & Integration", () => {
       mainAdminId,
       {
         business_name: "Resilient Redirect",
-        links: [{ platform: "other", destination_url: "https://resilient.example.com", is_enabled: true }],
+        qr_type: "google_review",
+        links: [{ platform: "google_reviews", destination_url: "https://resilient.example.com", is_enabled: true }],
       },
-      { business_name: "Resilient Redirect" }
+      { business_name: "Resilient Redirect", qr_type: "google_review" }
     );
     expect(created.success).toBe(true);
     if (!created.success) return;
@@ -650,9 +663,10 @@ describe("Public Redirect System — Endpoints & Integration", () => {
       mainAdminId,
       {
         business_name: "Secure Parameter Shop",
-        links: [{ platform: "other", destination_url: legitimateUrl, is_enabled: true }],
+        qr_type: "google_review",
+        links: [{ platform: "google_reviews", destination_url: legitimateUrl, is_enabled: true }],
       },
-      { business_name: "Secure Parameter Shop" }
+      { business_name: "Secure Parameter Shop", qr_type: "google_review" }
     );
     expect(created.success).toBe(true);
     if (!created.success) return;
@@ -686,9 +700,10 @@ describe("Public Redirect System — Endpoints & Integration", () => {
       mainAdminId,
       {
         business_name: "Prefetch Test Shop",
-        links: [{ platform: "other", destination_url: destinationUrl, is_enabled: true }],
+        qr_type: "google_review",
+        links: [{ platform: "google_reviews", destination_url: destinationUrl, is_enabled: true }],
       },
-      { business_name: "Prefetch Test Shop" }
+      { business_name: "Prefetch Test Shop", qr_type: "google_review" }
     );
     expect(created.success).toBe(true);
     if (!created.success) return;
@@ -744,9 +759,10 @@ describe("Public Redirect System — Endpoints & Integration", () => {
       mainAdminId,
       {
         business_name: "Bot Test Shop",
-        links: [{ platform: "other", destination_url: destinationUrl, is_enabled: true }],
+        qr_type: "google_review",
+        links: [{ platform: "google_reviews", destination_url: destinationUrl, is_enabled: true }],
       },
-      { business_name: "Bot Test Shop" }
+      { business_name: "Bot Test Shop", qr_type: "google_review" }
     );
     expect(created.success).toBe(true);
     if (!created.success) return;
@@ -792,9 +808,10 @@ describe("Public Redirect System — Endpoints & Integration", () => {
       mainAdminId,
       {
         business_name: "Human Visit Cafe",
-        links: [{ platform: "other", destination_url: destinationUrl, is_enabled: true }],
+        qr_type: "google_review",
+        links: [{ platform: "google_reviews", destination_url: destinationUrl, is_enabled: true }],
       },
-      { business_name: "Human Visit Cafe" }
+      { business_name: "Human Visit Cafe", qr_type: "google_review" }
     );
     expect(created.success).toBe(true);
     if (!created.success) return;
@@ -825,5 +842,277 @@ describe("Public Redirect System — Endpoints & Integration", () => {
     expect(events.results).toHaveLength(1);
     expect(events.results[0].user_agent).toBe(humanUa);
     expect(events.results[0].referrer).toBe("https://tapme.link/qr");
+  });
+});
+
+describe("Phase 3: Immutable QR Types and Redirect Behavior", () => {
+  it("Single-purpose: google_review redirects HTTP 302 directly to Google Review URL", async () => {
+    const url = "https://g.page/r/test-google-direct";
+    const created = await createCard(
+      testEnv,
+      mainAdminId,
+      {
+        business_name: "Google Single",
+        qr_type: "google_review",
+        links: [{ platform: "google_reviews", destination_url: url, is_enabled: true }],
+      },
+      { business_name: "Google Single", qr_type: "google_review" }
+    );
+    expect(created.success).toBe(true);
+    if (!created.success) return;
+
+    const res = await worker.fetch(new Request(`http://localhost:8787/r/${created.card.public_token}`, {
+      redirect: "manual",
+    }), testEnv, { waitUntil: () => {}, passThroughOnException: () => {} } as any);
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe(url);
+    expect(res.headers.get("Cache-Control")).toContain("no-store");
+  });
+
+  it("Single-purpose: instagram redirects HTTP 302 directly to Instagram URL", async () => {
+    const url = "https://instagram.com/direct-shop";
+    const created = await createCard(
+      testEnv,
+      mainAdminId,
+      {
+        business_name: "Insta Single",
+        qr_type: "instagram",
+        links: [{ platform: "instagram", destination_url: url, is_enabled: true }],
+      },
+      { business_name: "Insta Single", qr_type: "instagram" }
+    );
+    expect(created.success).toBe(true);
+    if (!created.success) return;
+
+    const res = await worker.fetch(new Request(`http://localhost:8787/r/${created.card.public_token}`, {
+      redirect: "manual",
+    }), testEnv, { waitUntil: () => {}, passThroughOnException: () => {} } as any);
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe(url);
+    expect(res.headers.get("Cache-Control")).toContain("no-store");
+  });
+
+  it("Single-purpose: whatsapp redirects HTTP 302 directly to WhatsApp URL", async () => {
+    const url = "https://wa.me/919876543210";
+    const created = await createCard(
+      testEnv,
+      mainAdminId,
+      {
+        business_name: "WhatsApp Single",
+        qr_type: "whatsapp",
+        links: [{ platform: "whatsapp", destination_url: url, is_enabled: true }],
+      },
+      { business_name: "WhatsApp Single", qr_type: "whatsapp" }
+    );
+    expect(created.success).toBe(true);
+    if (!created.success) return;
+
+    const res = await worker.fetch(new Request(`http://localhost:8787/r/${created.card.public_token}`, {
+      redirect: "manual",
+    }), testEnv, { waitUntil: () => {}, passThroughOnException: () => {} } as any);
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe(url);
+    expect(res.headers.get("Cache-Control")).toContain("no-store");
+  });
+
+  it("Single-purpose: missing destination (unconfigured) returns HTTP 404 unavailable", async () => {
+    const created = await createCard(
+      testEnv,
+      mainAdminId,
+      {
+        business_name: "Unconfigured Single",
+        qr_type: "google_review",
+        links: [],
+      },
+      { business_name: "Unconfigured Single", qr_type: "google_review" }
+    );
+    expect(created.success).toBe(true);
+    if (!created.success) return;
+
+    const res = await worker.fetch(new Request(`http://localhost:8787/r/${created.card.public_token}`, {
+      redirect: "manual",
+    }), testEnv, { waitUntil: () => {}, passThroughOnException: () => {} } as any);
+
+    expect(res.status).toBe(404);
+    expect(res.headers.get("Location")).toBeNull();
+    const html = await res.text();
+    expect(html).toContain("Destinations are not currently available");
+  });
+
+  it("Single-purpose: disabled destination returns HTTP 404 unavailable", async () => {
+    const created = await createCard(
+      testEnv,
+      mainAdminId,
+      {
+        business_name: "Disabled Single",
+        qr_type: "instagram",
+        links: [{ platform: "instagram", destination_url: "https://instagram.com/disabled", is_enabled: false }],
+      },
+      { business_name: "Disabled Single", qr_type: "instagram" }
+    );
+    expect(created.success).toBe(true);
+    if (!created.success) return;
+
+    const res = await worker.fetch(new Request(`http://localhost:8787/r/${created.card.public_token}`, {
+      redirect: "manual",
+    }), testEnv, { waitUntil: () => {}, passThroughOnException: () => {} } as any);
+
+    expect(res.status).toBe(404);
+    expect(res.headers.get("Location")).toBeNull();
+    const html = await res.text();
+    expect(html).toContain("Destinations are not currently available");
+  });
+
+  it("All-in-one: 1 enabled link returns HTTP 200 selection page (never HTTP 302)", async () => {
+    const url = "https://example.com/one-and-only";
+    const created = await createCard(
+      testEnv,
+      mainAdminId,
+      {
+        business_name: "All In One Single Destination",
+        qr_type: "all_in_one",
+        links: [{ platform: "other", destination_url: url, label: "Our Website", is_enabled: true }],
+      },
+      { business_name: "All In One Single Destination", qr_type: "all_in_one" }
+    );
+    expect(created.success).toBe(true);
+    if (!created.success) return;
+
+    const res = await worker.fetch(new Request(`http://localhost:8787/r/${created.card.public_token}`, {
+      redirect: "manual",
+    }), testEnv, { waitUntil: () => {}, passThroughOnException: () => {} } as any);
+
+    // Must be HTTP 200 - NEVER 302!
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Location")).toBeNull();
+    const html = await res.text();
+    expect(html).toContain("All In One Single Destination");
+    expect(html).toContain(url);
+    expect(html).toContain("Our Website");
+
+    // Also verify JSON client response
+    const resJson = await worker.fetch(new Request(`http://localhost:8787/r/${created.card.public_token}`, {
+      headers: { Accept: "application/json" },
+    }), testEnv, { waitUntil: () => {}, passThroughOnException: () => {} } as any);
+
+    expect(resJson.status).toBe(200);
+    const json = (await resJson.json()) as any;
+    expect(json.success).toBe(true);
+    expect(json.data.status).toBe("multiple");
+    expect(json.data.links).toHaveLength(1);
+  });
+
+  it("All-in-one: multiple enabled links return HTTP 200 selection page", async () => {
+    const created = await createCard(
+      testEnv,
+      mainAdminId,
+      {
+        business_name: "All In One Multi",
+        qr_type: "all_in_one",
+        links: [
+          { platform: "google_reviews", destination_url: "https://g.page/multi", is_enabled: true },
+          { platform: "instagram", destination_url: "https://instagram.com/multi", is_enabled: true },
+          { platform: "whatsapp", destination_url: "https://wa.me/911234567890", is_enabled: true },
+        ],
+      },
+      { business_name: "All In One Multi", qr_type: "all_in_one" }
+    );
+    expect(created.success).toBe(true);
+    if (!created.success) return;
+
+    const res = await worker.fetch(new Request(`http://localhost:8787/r/${created.card.public_token}`, {
+      redirect: "manual",
+    }), testEnv, { waitUntil: () => {}, passThroughOnException: () => {} } as any);
+
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("https://g.page/multi");
+    expect(html).toContain("https://instagram.com/multi");
+    expect(html).toContain("https://wa.me/911234567890");
+  });
+
+  it("All-in-one: 0 enabled links (all disabled) returns HTTP 404 unavailable", async () => {
+    const created = await createCard(
+      testEnv,
+      mainAdminId,
+      {
+        business_name: "All In One All Disabled",
+        qr_type: "all_in_one",
+        links: [
+          { platform: "google_reviews", destination_url: "https://g.page/multi-dis", is_enabled: false },
+          { platform: "instagram", destination_url: "https://instagram.com/multi-dis", is_enabled: false },
+        ],
+      },
+      { business_name: "All In One All Disabled", qr_type: "all_in_one" }
+    );
+    expect(created.success).toBe(true);
+    if (!created.success) return;
+
+    const res = await worker.fetch(new Request(`http://localhost:8787/r/${created.card.public_token}`, {
+      redirect: "manual",
+    }), testEnv, { waitUntil: () => {}, passThroughOnException: () => {} } as any);
+
+    expect(res.status).toBe(404);
+    const html = await res.text();
+    expect(html).toContain("Destinations are not currently available");
+  });
+
+  it("Unconfigured card returns HTTP 404 on customer API /api/public/cards/:token", async () => {
+    const created = await createCard(
+      testEnv,
+      mainAdminId,
+      {
+        business_name: "Unconfigured Public API",
+        qr_type: "all_in_one",
+        links: [],
+      },
+      { business_name: "Unconfigured Public API", qr_type: "all_in_one" }
+    );
+    expect(created.success).toBe(true);
+    if (!created.success) return;
+
+    const resApi = await worker.fetch(new Request(`http://localhost:8787/api/public/cards/${created.card.public_token}`), testEnv, {
+      waitUntil: () => {},
+      passThroughOnException: () => {},
+    } as any);
+
+    expect(resApi.status).toBe(404);
+    const json = (await resApi.json()) as any;
+    expect(json.success).toBe(false);
+    expect(json.status).toBe("unavailable");
+    expect(json.error).toBe("Card is currently unavailable.");
+  });
+
+  it("Public responses never leak internal card numbers or creator details", async () => {
+    const created = await createCard(
+      testEnv,
+      mainAdminId,
+      {
+        business_name: "Privacy Guard Test",
+        qr_type: "google_review",
+        links: [{ platform: "google_reviews", destination_url: "https://g.page/privacy", is_enabled: true }],
+      },
+      { business_name: "Privacy Guard Test", qr_type: "google_review" }
+    );
+    expect(created.success).toBe(true);
+    if (!created.success) return;
+
+    const token = created.card.public_token;
+
+    // Test API route
+    const resApi = await worker.fetch(new Request(`http://localhost:8787/api/public/cards/${token}`), testEnv, {
+      waitUntil: () => {},
+      passThroughOnException: () => {},
+    } as any);
+
+    expect(resApi.status).toBe(200);
+    const json = (await resApi.json()) as any;
+    expect(json.data.card_number).toBeUndefined();
+    expect(json.data.created_by).toBeUndefined();
+    expect(json.data.public_token).toBeUndefined();
+    expect(json.data.qr_type).toBe("google_review");
   });
 });

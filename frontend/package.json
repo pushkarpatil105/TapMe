@@ -7,10 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "test": "node --test src/utils/qr-generator.test.js src/utils/pages-proxy.test.js",
+    "test": "node --test src/utils/qr-generator.test.js src/utils/pages-proxy.test.js src/utils/staff-management.test.js src/utils/card-workflow.test.js src/utils/qr-scanner.test.js src/utils/audit-workflow.test.js src/utils/system-management.test.js",
     "preview": "vite preview"
   },
   "dependencies": {
+    "jsqr": "^1.4.0",
     "qrcode": "^1.5.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"

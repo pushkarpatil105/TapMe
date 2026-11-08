@@ -58,7 +58,7 @@ export function QRCodeDisplay({ card }) {
     let isCancelled = false
 
     async function drawPreview() {
-      if (!publicUrl || !canvasRef.current || !logo) {
+      if (!publicUrl || !canvasRef.current) {
         setLoading(false)
         return
       }
@@ -95,7 +95,7 @@ export function QRCodeDisplay({ card }) {
 
   // Handle PNG download (2048 x 2048)
   const handleDownloadPng = async () => {
-    if (!publicUrl || !logo || downloadingPng) return
+    if (!publicUrl || downloadingPng) return
 
     try {
       setDownloadingPng(true)
@@ -114,7 +114,7 @@ export function QRCodeDisplay({ card }) {
 
   // Handle SVG download (Genuine vector SVG)
   const handleDownloadSvg = async () => {
-    if (!publicUrl || !logo || downloadingSvg) return
+    if (!publicUrl || downloadingSvg) return
 
     try {
       setDownloadingSvg(true)
@@ -160,13 +160,21 @@ export function QRCodeDisplay({ card }) {
             {cardStatus}
           </span>
         </div>
-        {logo && (
+        {logo ? (
           <span
             className="link-platform-tag"
             style={{ borderColor: `${logo.color}55`, color: logo.color }}
             title={`Center logo: ${logo.label}`}
           >
             {logo.label}
+          </span>
+        ) : (
+          <span
+            className="link-platform-tag"
+            style={{ borderColor: 'rgba(255, 255, 255, 0.2)', color: '#94a3b8' }}
+            title="Clean Standard QR (No Center Logo)"
+          >
+            Standard QR
           </span>
         )}
       </div>

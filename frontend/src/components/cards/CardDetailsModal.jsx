@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { QRCodeDisplay } from './QRCodeDisplay'
+import { QR_TYPE_CONFIG } from '../../utils/card-workflow'
 
 export function CardDetailsModal({
   cardId,
@@ -162,6 +163,12 @@ export function CardDetailsModal({
                   <span className="details-label">Total Scans</span>
                   <span className="scan-count-badge">{card.total_scans ?? 0}</span>
                 </div>
+                <div className="details-item">
+                  <span className="details-label">Permanent QR Type</span>
+                  <span className="details-value font-medium text-main">
+                    {QR_TYPE_CONFIG[card.qr_type]?.label || card.qr_type}
+                  </span>
+                </div>
               </div>
 
               {/* QR Code & Permanent Redirect */}
@@ -266,14 +273,14 @@ export function CardDetailsModal({
             </>
           )}
 
-          {/* Edit Card allowed for Main Admin only when not archived */}
-          {isMainAdmin && card && card.status !== 'archived' && (
+          {/* Edit / Configure Card allowed for Main Admin (or Staff for unconfigured cards) when not archived */}
+          {card && card.status !== 'archived' && (isMainAdmin || !card.is_configured) && (
             <button
               type="button"
               className="action-btn action-btn-secondary"
               onClick={() => onEdit(card)}
             >
-              Edit Card
+              {isMainAdmin ? 'Edit Card' : 'Configure Card'}
             </button>
           )}
 

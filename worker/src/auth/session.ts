@@ -58,7 +58,8 @@ export async function getSession(
      INNER JOIN admins ON admins.id = sessions.admin_id
      WHERE sessions.token_hash = ?
        AND sessions.expires_at > ?
-       AND admins.status = 'active'`,
+       AND admins.status = 'active'
+       AND (admins.deleted_at IS NULL)`,
   )
     .bind(tokenHash, new Date().toISOString())
     .first<{ id: string; username: string; role: string }>();

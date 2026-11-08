@@ -21,3 +21,6 @@ coverage/
 # Local development files
 .DS_Store
 Thumbs.db
+
+# Local database dumps
+worker/backups/

@@ -19,14 +19,14 @@ describe('TapMe Phase 4 Batch 2 - QR Generator & Exporters Test Suite', () => {
     it('generates canonical redirect URL pointing to /r/:token', () => {
       const token = 'u4W7r-k0b8s_k9A1B2C3D4E5'
       const url = getPublicCardUrl(token)
-      assert.strictEqual(url, `http://127.0.0.1:8787/r/${token}`)
+      assert.strictEqual(url, `https://tapme-ayd.pages.dev/r/${token}`)
       assert(!url.includes('destination'), 'Must not encode destination URLs')
     })
 
     it('safely encodes special characters in public tokens', () => {
       const token = 'token+with/special=chars'
       const url = getPublicCardUrl(token)
-      assert.strictEqual(url, 'http://127.0.0.1:8787/r/token%2Bwith%2Fspecial%3Dchars')
+      assert.strictEqual(url, 'https://tapme-ayd.pages.dev/r/token%2Bwith%2Fspecial%3Dchars')
     })
 
     it('identifies local development URLs accurately', () => {
@@ -110,7 +110,7 @@ describe('TapMe Phase 4 Batch 2 - QR Generator & Exporters Test Suite', () => {
 
   describe('2. Error Correction Level H Verification', () => {
     it('enforces QR error correction level H', () => {
-      const url = 'http://127.0.0.1:8787/r/u4W7r-k0b8s_k9A1B2C3D4E5'
+      const url = 'https://tapme-ayd.pages.dev/r/u4W7r-k0b8s_k9A1B2C3D4E5'
       const qr = QRCode.create(url, { errorCorrectionLevel: 'H', margin: 4 })
       // Level H retains ~30% recovery capability (bit: 2)
       assert.strictEqual(qr.errorCorrectionLevel.bit, 2)
@@ -118,80 +118,62 @@ describe('TapMe Phase 4 Batch 2 - QR Generator & Exporters Test Suite', () => {
     })
   })
 
-  describe('3. Logo Selection Rules', () => {
-    it('selects Google Reviews logo for single enabled Google link', () => {
-      const card = {
-        links: [
-          { platform: 'google_reviews', destination_url: 'https://g.page/r/test', is_enabled: true },
-        ],
+  describe('3. Logo Selection Rules (Immutable qr_type Mapping)', () => {
+    it('maps google_review to Google Reviews logo regardless of links', () => {
+      const cardWithNoLinks = { qr_type: 'google_review', links: [] }
+      const logo1 = getQRLogoForCard(cardWithNoLinks)
+      assert.strictEqual(logo1.id, 'google_reviews')
+      assert.strictEqual(logo1.label, 'Google Reviews')
+
+      // Changing destination links must NEVER alter the physical QR logo
+      const cardWithOtherLinks = {
+        qr_type: 'google_review',
+        links: [{ platform: 'other', destination_url: 'https://example.com' }],
       }
-      const logo = getQRLogoForCard(card)
-      assert.strictEqual(logo.id, 'google_reviews')
-      assert.strictEqual(logo.label, 'Google Reviews')
+      assert.strictEqual(getQRLogoForCard(cardWithOtherLinks).id, 'google_reviews')
+      assert.strictEqual(getQRLogoForCard('google_review').id, 'google_reviews')
     })
 
-    it('selects Instagram logo for single enabled Instagram link', () => {
-      const card = {
-        links: [
-          { platform: 'instagram', destination_url: 'https://instagram.com/test', is_enabled: true },
-        ],
-      }
+    it('maps instagram to Instagram logo regardless of links', () => {
+      const card = { qr_type: 'instagram', links: [] }
       const logo = getQRLogoForCard(card)
       assert.strictEqual(logo.id, 'instagram')
       assert.strictEqual(logo.label, 'Instagram')
+      assert.strictEqual(getQRLogoForCard('instagram').id, 'instagram')
     })
 
-    it('selects WhatsApp logo for single enabled WhatsApp link', () => {
-      const card = {
-        links: [
-          { platform: 'whatsapp', destination_url: 'https://wa.me/12345', is_enabled: true },
-        ],
-      }
+    it('maps whatsapp to WhatsApp logo regardless of links', () => {
+      const card = { qr_type: 'whatsapp', links: [] }
       const logo = getQRLogoForCard(card)
       assert.strictEqual(logo.id, 'whatsapp')
       assert.strictEqual(logo.label, 'WhatsApp')
+      assert.strictEqual(getQRLogoForCard('whatsapp').id, 'whatsapp')
     })
 
-    it('selects Website/Other logo for single enabled Website link', () => {
-      const card = {
-        links: [
-          { platform: 'other', destination_url: 'https://example.com', is_enabled: true },
-        ],
-      }
-      const logo = getQRLogoForCard(card)
-      assert.strictEqual(logo.id, 'other')
-      assert.strictEqual(logo.label, 'Website / Other')
-    })
-
-    it('selects TapMe Branding logo for multiple enabled links', () => {
-      const card = {
-        links: [
-          { platform: 'google_reviews', is_enabled: true },
-          { platform: 'instagram', is_enabled: true },
-          { platform: 'whatsapp', is_enabled: true },
-        ],
-      }
-      const logo = getQRLogoForCard(card)
-      assert.strictEqual(logo.id, 'tapme')
-      assert.strictEqual(logo.label, 'TapMe Multi-Link')
-    })
-
-    it('selects single-platform logo when other links are disabled', () => {
-      const card = {
-        links: [
-          { platform: 'google_reviews', is_enabled: false },
-          { platform: 'whatsapp', is_enabled: true },
-          { platform: 'instagram', is_enabled: false },
-        ],
-      }
-      const logo = getQRLogoForCard(card)
-      assert.strictEqual(logo.id, 'whatsapp')
-    })
-
-    it('selects TapMe Branding logo when 0 links are configured or enabled', () => {
-      assert.strictEqual(getQRLogoForCard({ links: [] }).id, 'tapme')
-      assert.strictEqual(getQRLogoForCard({ links: [{ platform: 'other', is_enabled: false }] }).id, 'tapme')
-      assert.strictEqual(getQRLogoForCard(null).id, 'tapme')
+    it('maps all_in_one to null (strictly no logo, no center patch)', () => {
+      // 0 links
+      assert.strictEqual(getQRLogoForCard({ qr_type: 'all_in_one', links: [] }), null)
+      // 1 link
+      assert.strictEqual(
+        getQRLogoForCard({
+          qr_type: 'all_in_one',
+          links: [{ platform: 'google_reviews', is_enabled: true }],
+        }),
+        null
+      )
+      // Multiple links
+      assert.strictEqual(
+        getQRLogoForCard({
+          qr_type: 'all_in_one',
+          links: [
+            { platform: 'google_reviews', is_enabled: true },
+            { platform: 'instagram', is_enabled: true },
+          ],
+        }),
+        null
+      )
+      assert.strictEqual(getQRLogoForCard('all_in_one'), null)
+      assert.strictEqual(getQRLogoForCard(null), null)
     })
   })
 
@@ -205,8 +187,8 @@ describe('TapMe Phase 4 Batch 2 - QR Generator & Exporters Test Suite', () => {
   })
 
   describe('5. Vector SVG Generation & Embedded Artwork', () => {
-    it('generates genuine SVG with embedded vector markup (not external image)', async () => {
-      const url = 'http://127.0.0.1:8787/r/sample-token'
+    it('generates genuine SVG with embedded vector markup for single-purpose logos', async () => {
+      const url = 'https://tapme-ayd.pages.dev/r/sample-token'
       const logo = QR_LOGOS.google_reviews
       const svg = await generateQrSvgString(url, logo, { size: 2048 })
 
@@ -232,14 +214,32 @@ describe('TapMe Phase 4 Batch 2 - QR Generator & Exporters Test Suite', () => {
       assert(!svg.includes('xlink:href'), 'SVG must not use xlink:href')
     })
 
-    it('generates valid vector SVG for TapMe multi-link branding with gradient defs', async () => {
-      const url = 'http://127.0.0.1:8787/r/sample-token'
-      const logo = QR_LOGOS.tapme
-      const svg = await generateQrSvgString(url, logo, { size: 2048 })
+    it('generates clean standard SVG with NO center logo or white patch for all_in_one', async () => {
+      const url = 'https://tapme-ayd.pages.dev/r/all-in-one-token'
+      // all_in_one maps to null logo
+      const svg = await generateQrSvgString(url, null, { size: 2048 })
 
-      assert(svg.includes('<g id="qr-center-logo">'))
-      assert(svg.includes('tapme-grad'))
-      assert(svg.includes('<rect width="24" height="24" rx="6" fill="url(#tapme-grad)"/>'))
+      assert(svg.startsWith('<svg width="2048" height="2048"'))
+      assert(svg.endsWith('</svg>'))
+
+      // Strictly NO center logo group or center quiet-zone patch
+      assert(!svg.includes('<g id="qr-center-logo">'), 'all_in_one SVG must not contain qr-center-logo group')
+      assert(!svg.includes('id="qr-center-logo"'))
+      assert(!svg.includes('<rect'), 'all_in_one SVG must not contain center mask rect')
+      assert(!svg.includes('tapme-grad'), 'all_in_one SVG must not contain TapMe branding')
+      assert(!svg.includes('viewBox="0 0 24 24"'), 'all_in_one SVG must not contain center logo viewBox')
+    })
+
+    it('generates valid vector SVG for Instagram and WhatsApp single-purpose logos', async () => {
+      const url = 'https://tapme-ayd.pages.dev/r/sample-token'
+
+      const igSvg = await generateQrSvgString(url, QR_LOGOS.instagram, { size: 2048 })
+      assert(igSvg.includes('<g id="qr-center-logo">'))
+      assert(igSvg.includes('ig-grad'))
+
+      const waSvg = await generateQrSvgString(url, QR_LOGOS.whatsapp, { size: 2048 })
+      assert(waSvg.includes('<g id="qr-center-logo">'))
+      assert(waSvg.includes('#25D366'))
     })
   })
 
@@ -395,7 +395,7 @@ describe('TapMe Phase 4 Batch 2 - QR Generator & Exporters Test Suite', () => {
     }
 
     it('successfully decodes SVG QR codes with Google Reviews center logo', async () => {
-      const url = 'http://127.0.0.1:8787/r/google-scan-token'
+      const url = 'https://tapme-ayd.pages.dev/r/google-scan-token'
       const svg = await generateQrSvgString(url, QR_LOGOS.google_reviews)
       const { rgba, imageSize } = rasterizeSvgToPixelBuffer(svg, 10)
       const decoded = jsQR(rgba, imageSize, imageSize)
@@ -405,7 +405,7 @@ describe('TapMe Phase 4 Batch 2 - QR Generator & Exporters Test Suite', () => {
     })
 
     it('successfully decodes SVG QR codes with Instagram center logo', async () => {
-      const url = 'http://127.0.0.1:8787/r/instagram-scan-token'
+      const url = 'https://tapme-ayd.pages.dev/r/instagram-scan-token'
       const svg = await generateQrSvgString(url, QR_LOGOS.instagram)
       const { rgba, imageSize } = rasterizeSvgToPixelBuffer(svg, 10)
       const decoded = jsQR(rgba, imageSize, imageSize)
@@ -415,7 +415,7 @@ describe('TapMe Phase 4 Batch 2 - QR Generator & Exporters Test Suite', () => {
     })
 
     it('successfully decodes SVG QR codes with WhatsApp center logo', async () => {
-      const url = 'http://127.0.0.1:8787/r/whatsapp-scan-token'
+      const url = 'https://tapme-ayd.pages.dev/r/whatsapp-scan-token'
       const svg = await generateQrSvgString(url, QR_LOGOS.whatsapp)
       const { rgba, imageSize } = rasterizeSvgToPixelBuffer(svg, 10)
       const decoded = jsQR(rgba, imageSize, imageSize)
@@ -424,23 +424,14 @@ describe('TapMe Phase 4 Batch 2 - QR Generator & Exporters Test Suite', () => {
       assert.strictEqual(decoded.data, url)
     })
 
-    it('successfully decodes SVG QR codes with Website/Other center logo', async () => {
-      const url = 'http://127.0.0.1:8787/r/website-scan-token'
-      const svg = await generateQrSvgString(url, QR_LOGOS.other)
+    it('successfully decodes All-In-One clean standard SVG QR codes (no center logo)', async () => {
+      const url = 'https://tapme-ayd.pages.dev/r/all-in-one-scan-token'
+      // all_in_one maps to null logo
+      const svg = await generateQrSvgString(url, null)
       const { rgba, imageSize } = rasterizeSvgToPixelBuffer(svg, 10)
       const decoded = jsQR(rgba, imageSize, imageSize)
 
-      assert(decoded, 'QR barcode decoder must successfully detect and decode QR')
-      assert.strictEqual(decoded.data, url)
-    })
-
-    it('successfully decodes SVG QR codes with TapMe multi-link center logo', async () => {
-      const url = 'http://127.0.0.1:8787/r/tapme-multi-token'
-      const svg = await generateQrSvgString(url, QR_LOGOS.tapme)
-      const { rgba, imageSize } = rasterizeSvgToPixelBuffer(svg, 10)
-      const decoded = jsQR(rgba, imageSize, imageSize)
-
-      assert(decoded, 'QR barcode decoder must successfully detect and decode QR')
+      assert(decoded, 'Clean All-In-One QR barcode must successfully decode')
       assert.strictEqual(decoded.data, url)
     })
   })

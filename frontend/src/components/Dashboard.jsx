@@ -1,10 +1,15 @@
 import { useState } from 'react'
 import { useAuth } from '../context'
 import { CardsSection } from './cards/CardsSection'
+import { StaffSection } from './staff/StaffSection'
+import { AuditSection } from './audit/AuditSection'
+import { SystemHealthSection } from './system/SystemHealthSection'
+import { StorageSection } from './system/StorageSection'
 
 export function Dashboard() {
   const { user, logout } = useAuth()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [activeSection, setActiveSection] = useState('cards')
 
   const handleLogout = async () => {
     setIsLoggingOut(true)
@@ -13,6 +18,7 @@ export function Dashboard() {
 
   const isMainAdmin = user?.role === 'main_admin'
   const roleLabel = isMainAdmin ? 'Main Administrator' : 'Staff Member'
+  const effectiveSection = isMainAdmin ? activeSection : 'cards'
 
   return (
     <div className="dashboard-viewport">
@@ -117,8 +123,93 @@ export function Dashboard() {
             </div>
           </section>
 
-          {/* Card Management Section */}
-          <CardsSection />
+          {/* Dashboard Section Navigation Tabs */}
+          <nav className="dashboard-tabs-bar" aria-label="Dashboard sections">
+            <button
+              type="button"
+              className={`dashboard-tab-btn ${effectiveSection === 'cards' ? 'active' : ''}`}
+              onClick={() => setActiveSection('cards')}
+            >
+              <svg className="tab-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" />
+                <path
+                  fillRule="evenodd"
+                  d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              <span>Cards</span>
+            </button>
+
+            {isMainAdmin && (
+              <button
+                type="button"
+                className={`dashboard-tab-btn ${effectiveSection === 'staff' ? 'active' : ''}`}
+                onClick={() => setActiveSection('staff')}
+              >
+                <svg className="tab-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
+                </svg>
+                <span>Staff Management</span>
+              </button>
+            )}
+
+            {isMainAdmin && (
+              <button
+                type="button"
+                className={`dashboard-tab-btn ${effectiveSection === 'audit' ? 'active' : ''}`}
+                onClick={() => setActiveSection('audit')}
+              >
+                <svg className="tab-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path
+                    fillRule="evenodd"
+                    d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                <span>Audit Logs</span>
+              </button>
+            )}
+
+            {isMainAdmin && (
+              <button
+                type="button"
+                className={`dashboard-tab-btn ${effectiveSection === 'health' ? 'active' : ''}`}
+                onClick={() => setActiveSection('health')}
+              >
+                <svg className="tab-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
+                </svg>
+                <span>System Health</span>
+              </button>
+            )}
+
+            {isMainAdmin && (
+              <button
+                type="button"
+                className={`dashboard-tab-btn ${effectiveSection === 'storage' ? 'active' : ''}`}
+                onClick={() => setActiveSection('storage')}
+              >
+                <svg className="tab-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path d="M3 12v3c0 1.657 3.134 3 7 3s7-1.343 7-3v-3c0 1.657-3.134 3-7 3s-7-1.343-7-3z" />
+                  <path d="M3 7v3c0 1.657 3.134 3 7 3s7-1.343 7-3V7c0 1.657-3.134 3-7 3S3 8.657 3 7z" />
+                  <path d="M17 4c0 1.657-3.134 3-7 3S3 5.657 3 4s3.134-3 7-3 7 1.343 7 3z" />
+                </svg>
+                <span>Storage & Retention</span>
+              </button>
+            )}
+          </nav>
+
+          {/* Active Section Content */}
+          {effectiveSection === 'cards' && <CardsSection />}
+
+          {effectiveSection === 'staff' && isMainAdmin && <StaffSection />}
+
+          {effectiveSection === 'audit' && isMainAdmin && <AuditSection />}
+
+          {effectiveSection === 'health' && isMainAdmin && <SystemHealthSection />}
+
+          {effectiveSection === 'storage' && isMainAdmin && <StorageSection />}
 
           {/* Upcoming Features Grid */}
           <section className="placeholder-grid">
